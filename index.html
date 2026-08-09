@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Shop the Wall Repair Paste Kit for fast, tidy repairs to indoor walls.">
+  <title>Wall Repair Paste Kit | HomeFix</title>
+  <style>
+    :root { --ink:#18202a; --muted:#657080; --line:#e4e8ed; --brand:#ff6a00; --brand-dark:#e85f00; --paper:#fff; --wash:#f6f7f9; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:var(--wash); }
+    button { font:inherit; cursor:pointer; } a { color:inherit; text-decoration:none; }
+    .topline { height:5px; background:var(--brand); }
+    header { background:var(--paper); border-bottom:1px solid var(--line); }
+    .bar, main { width:min(1180px, calc(100% - 40px)); margin:auto; }
+    .bar { min-height:70px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { font-size:22px; font-weight:850; letter-spacing:-.8px; } .brand span { color:var(--brand); }
+    .cart-button { position:relative; display:flex; gap:9px; align-items:center; border:1px solid var(--line); border-radius:9px; padding:10px 14px; background:#fff; font-weight:700; }
+    .badge { position:absolute; right:-8px; top:-9px; width:21px; height:21px; border-radius:50%; display:grid; place-items:center; color:white; background:var(--brand); font-size:12px; }
+    .crumb { color:var(--muted); font-size:13px; padding:22px 0 18px; } .crumb strong { color:var(--ink); }
+    .product { display:grid; grid-template-columns:minmax(0, 1.03fr) minmax(360px, .97fr); gap:48px; padding:10px 0 58px; }
+    .gallery { min-width:0; } .hero { aspect-ratio:1/1; overflow:hidden; border-radius:15px; background:white; border:1px solid var(--line); }
+    .hero img { width:100%; height:100%; object-fit:contain; display:block; transition:opacity .16s ease; }
+    .thumbs { display:flex; gap:10px; overflow:auto; padding:14px 1px 2px; }
+    .thumb { width:72px; height:72px; flex:0 0 72px; padding:2px; background:#fff; border:2px solid transparent; border-radius:9px; overflow:hidden; }
+    .thumb.active { border-color:var(--brand); } .thumb img { width:100%; height:100%; object-fit:cover; border-radius:5px; }
+    .eyebrow { color:#9a4a00; font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { font-size:32px; line-height:1.14; letter-spacing:-1.15px; margin:8px 0 12px; }
+    .rating { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:14px; } .stars { color:#f59d00; letter-spacing:1px; } .divider { color:#c8ced6; }
+    .pricebox { background:#fff2e9; border-radius:12px; padding:17px 20px; margin:22px 0; } .price-label { color:#955325; font-size:12px; font-weight:700; text-transform:uppercase; } .price { font-size:32px; line-height:1.15; font-weight:850; margin-top:2px; } .old-price { font-size:14px; color:var(--muted); text-decoration:line-through; margin-left:8px; font-weight:500; }
+    .choice-group { border-top:1px solid var(--line); padding:18px 0; } .choice-title { font-weight:800; margin-bottom:10px; } .options { display:flex; flex-wrap:wrap; gap:9px; } .option { min-width:84px; border:1px solid #cbd2db; background:white; border-radius:8px; padding:9px 13px; font-weight:650; } .option.selected { border:2px solid var(--brand); background:#fff9f5; color:#bd4d00; padding:8px 12px; }
+    .buyrow { display:flex; gap:12px; align-items:stretch; margin-top:10px; } .qty { display:flex; align-items:center; border:1px solid #cad1da; border-radius:9px; background:white; } .qty button { width:36px; border:0; background:transparent; color:#44505e; font-size:20px; } .qty output { min-width:28px; text-align:center; font-weight:800; }
+    .add { flex:1; border:0; border-radius:9px; padding:14px 18px; color:white; background:var(--brand); font-weight:800; font-size:16px; box-shadow:0 5px 12px #ff6a0030; } .add:hover { background:var(--brand-dark); }
+    .benefits { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:22px; } .benefit { border-top:1px solid var(--line); padding-top:13px; font-size:13px; color:var(--muted); } .benefit b { display:block; color:var(--ink); margin-bottom:2px; }
+    .details { background:#fff; border-radius:14px; padding:28px; margin-bottom:54px; } h2 { margin:0 0 13px; font-size:21px; letter-spacing:-.4px; } .details-grid { display:grid; grid-template-columns:1.3fr 1fr; gap:42px; } .details p { margin:0; color:#536071; } .specs { margin:0; padding:0; list-style:none; } .specs li { border-bottom:1px solid var(--line); padding:8px 0; display:flex; justify-content:space-between; gap:10px; color:var(--muted); } .specs b { color:var(--ink); text-align:right; }
+    .toast { position:fixed; left:50%; bottom:24px; transform:translate(-50%, 130px); background:#1d2b24; color:white; padding:13px 19px; border-radius:9px; box-shadow:0 8px 24px #0003; transition:transform .22s ease; font-weight:650; z-index:4; } .toast.show { transform:translate(-50%, 0); }
+    .cart-panel { position:fixed; z-index:3; top:0; right:0; width:min(410px, 100%); height:100%; background:#fff; box-shadow:-8px 0 28px #18202a22; padding:24px; transform:translateX(105%); transition:transform .25s ease; display:flex; flex-direction:column; } .cart-panel.open { transform:translateX(0); } .cart-head { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:17px; } .icon-btn { border:0; background:none; font-size:24px; color:#56616d; } .cart-item { display:grid; grid-template-columns:68px 1fr auto; gap:12px; padding:18px 0; border-bottom:1px solid var(--line); } .cart-item img { width:68px; height:68px; object-fit:cover; border-radius:8px; } .cart-item strong { font-size:14px; line-height:1.3; display:block; } .cart-item small { color:var(--muted); display:block; margin-top:4px; } .remove { border:0; background:none; color:#a34416; padding:0; font-size:12px; } .cart-empty { text-align:center; color:var(--muted); padding:50px 15px; } .cart-total { margin-top:auto; border-top:1px solid var(--line); padding-top:18px; } .total-line { display:flex; justify-content:space-between; font-size:19px; font-weight:850; } .checkout { width:100%; margin-top:14px; border:0; border-radius:8px; padding:13px; color:white; background:var(--brand); font-weight:800; } .checkout:disabled { background:#c7cdd4; cursor:not-allowed; }
+    .overlay { display:none; position:fixed; inset:0; z-index:2; background:#10182077; } .overlay.open { display:block; }
+    @media (max-width:780px) { .bar, main { width:min(100% - 28px, 600px); } .product { grid-template-columns:1fr; gap:24px; padding-top:0; } h1 { font-size:27px; } .details-grid { grid-template-columns:1fr; gap:25px; } .benefits { grid-template-columns:1fr; gap:3px; } .hero { max-height:480px; } }
+    /* Visual refinement layer */
+    body { background:linear-gradient(180deg,#fff 0,#f6f7f9 640px); }
+    header { position:sticky; top:0; z-index:8; background:rgba(255,255,255,.93); backdrop-filter:blur(12px); }
+    .bar { min-height:76px; } .brand { font-size:24px; } .brand::before { content:'✦'; color:var(--brand); margin-right:6px; font-size:16px; vertical-align:2px; }
+    .cart-button { transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease; box-shadow:0 2px 8px #18202a08; }
+    .cart-button:hover { transform:translateY(-1px); border-color:#ffb47f; box-shadow:0 6px 16px #ff6a0017; }
+    .crumb { padding-top:29px; letter-spacing:.01em; }
+    .product { background:#fff; border:1px solid #edf0f3; border-radius:22px; padding:28px; gap:42px; box-shadow:0 18px 45px #172b4d0a; }
+    .hero { border-radius:13px; border:0; background:linear-gradient(145deg,#fbfbfb,#f1f3f5); }
+    .hero img { mix-blend-mode:multiply; } .thumbs { padding-top:12px; }
+    .thumb { width:65px; height:65px; flex-basis:65px; border-radius:10px; box-shadow:0 2px 7px #18202a0c; }
+    .thumb:hover { border-color:#ffbe91; } .thumb.active { box-shadow:0 4px 11px #ff6a0024; }
+    .eyebrow { display:inline-block; border-radius:999px; padding:5px 9px; background:#fff3e9; color:#b7520b; letter-spacing:.09em; }
+    h1 { max-width:540px; font-size:34px; } .rating { margin-top:2px; }
+    .pricebox { border:1px solid #ffdcc3; background:linear-gradient(100deg,#fff4eb,#fffaf5); box-shadow:inset 3px 0 var(--brand); }
+    .choice-group:last-of-type { padding-bottom:20px; } .option { transition:all .16s ease; } .option:hover { border-color:#ff9b56; }
+    .buyrow { margin-top:4px; } .qty { background:#fbfcfd; } .qty button:hover { color:var(--brand); background:#fff3e9; }
+    .add { letter-spacing:.01em; transition:transform .18s ease, box-shadow .18s ease; } .add:hover { transform:translateY(-1px); box-shadow:0 8px 18px #ff6a0040; }
+    .benefit { position:relative; padding-left:14px; } .benefit::before { content:'✓'; position:absolute; left:0; top:13px; color:#16964b; font-weight:900; }
+    .details { border:1px solid #e9edf1; box-shadow:0 14px 36px #172b4d09; margin-top:22px; }
+    .cart-panel { border-left:1px solid #e7ebef; } .cart-head h2 { margin:0; font-size:22px; }
+    .checkout { transition:background .16s ease, transform .16s ease; } .checkout:not(:disabled):hover { background:var(--brand-dark); transform:translateY(-1px); }
+    @media (max-width:780px) { .product { padding:16px; border-radius:15px; } .crumb { padding-top:19px; } h1 { font-size:28px; } .bar { min-height:64px; } .details { padding:20px; } }
+
+    /* Checkout: static styles ensure Live Server loads the complete layout immediately. */
+    .checkout-layer { position:fixed; inset:0; z-index:20; display:none; overflow:auto; background:#f5f7fa; }
+    .checkout-layer.open { display:block; }
+    .checkout-wrap { width:min(1020px, calc(100% - 32px)); margin:34px auto 60px; }
+    .checkout-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+    .checkout-top h2 { margin:0; font-size:25px; }
+    .checkout-close { border:0; background:transparent; font-size:28px; color:#586373; }
+    .checkout-grid { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:22px; align-items:start; }
+    .checkout-card { background:#fff; border:1px solid #e0e6ec; border-radius:16px; padding:24px; box-shadow:0 8px 20px #172b4d0a; }
+    .checkout-card h3 { margin:0 0 18px; font-size:18px; }
+    .checkout-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .checkout-fields .wide { grid-column:1/-1; }
+    .checkout-label { display:block; margin-bottom:6px; color:#536071; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .checkout-input { width:100%; border:1px solid #dce2e9; border-radius:8px; background:#f9fafb; padding:11px 12px; color:#17202a; font:inherit; }
+    .checkout-input:focus { outline:2px solid #ff6a0030; border-color:#ff6a00; background:#fff; }
+    .checkout-submit { width:100%; margin-top:20px; border:0; border-radius:9px; background:linear-gradient(110deg,#f35e00,#ff831f); padding:13px; color:#fff; font-weight:800; font-size:15px; }
+    .checkout-note { display:flex; gap:8px; margin-top:13px; color:#667180; font-size:12px; line-height:1.4; }
+    .summary-row { display:flex; justify-content:space-between; gap:12px; margin:11px 0; color:#586373; font-size:14px; }
+    .summary-row strong { color:#18202a; }
+    .summary-total { border-top:1px solid #e4e8ed; margin-top:16px; padding-top:16px; font-size:18px; font-weight:850; color:#18202a; }
+    .checkout-success { text-align:center; padding:38px 18px; }
+    .success-mark { display:grid; place-items:center; width:58px; height:58px; margin:0 auto 15px; border-radius:50%; background:#e8f8ee; color:#16803d; font-size:30px; font-weight:900; }
+    .checkout-success p { color:#5e6a78; max-width:430px; margin:9px auto 20px; }
+    .continue-btn { border:0; border-radius:8px; background:#ff6a00; color:#fff; padding:11px 18px; font-weight:800; }
+    .otp-card { max-width:470px; margin:54px auto; text-align:center; }
+    .otp-icon { display:grid; place-items:center; width:52px; height:52px; margin:0 auto 16px; border-radius:50%; background:#fff1e7; color:#e85f00; font-size:23px; font-weight:900; }
+    .otp-card p { color:#667180; margin:8px 0 20px; }
+    .otp-input { width:100%; border:1px solid #dce2e9; border-radius:9px; padding:14px; text-align:center; font:700 22px/1.2 ui-monospace,monospace; letter-spacing:.35em; }
+    .otp-input:focus { outline:2px solid #ff6a0030; border-color:#ff6a00; }
+    .otp-help { margin-top:11px; font-size:12px; color:#8b613f; }
+    .auth-overlay { position:fixed; inset:0; z-index:30; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(22,29,36,.62); backdrop-filter:blur(2px); }
+    .auth-overlay.open { display:flex; }
+    .auth-dialog { position:relative; width:min(530px,100%); background:#fff; padding:44px 64px 28px; box-shadow:0 24px 60px #0004; }
+    .auth-close { position:absolute; top:13px; right:16px; border:0; background:transparent; color:#26313d; font-size:29px; line-height:1; }
+    .auth-dialog h2 { margin:4px 0 12px; text-align:center; font-size:25px; letter-spacing:-.5px; }
+    .auth-protected { display:flex; justify-content:center; align-items:center; gap:7px; margin-bottom:34px; color:#3b4955; font-size:13px; }
+    .auth-protected::before { content:'✓'; display:grid; place-items:center; width:15px; height:15px; border-radius:50%; background:#11a96f; color:#fff; font-size:10px; font-weight:900; }
+    .auth-email { width:100%; border:1px solid #cfd5dc; padding:14px 13px; font:inherit; font-size:16px; }
+    .auth-email:focus { outline:2px solid #ff6a0028; border-color:#ff6a00; }
+    .auth-continue { width:100%; margin-top:18px; border:0; padding:13px; background:#ff6a00; color:#fff; font-size:17px; font-weight:800; transition:background .15s ease; }
+    .auth-continue:disabled { background:#d5d7da; cursor:not-allowed; }
+    .auth-divider { display:flex; align-items:center; gap:12px; margin:26px 0 18px; color:#8a939d; font-size:13px; } .auth-divider::before,.auth-divider::after { content:''; flex:1; height:1px; background:#e6e9ec; }
+    .auth-register { width:100%; border:1px solid #202b36; background:#fff; padding:12px; color:#202b36; font-weight:750; }
+    .auth-terms { margin:24px auto 0; color:#89919a; font-size:11px; line-height:1.35; text-align:center; }
+    @media (max-width:560px) { .auth-dialog { padding:40px 25px 24px; } }
+    .checkout-icon-field { position:relative; }
+    .checkout-input-with-icon { padding-left:42px; }
+    .checkout-input-icon { position:absolute; left:13px; top:50%; z-index:1; width:17px; height:17px; transform:translateY(-50%); color:#9aa4b2; pointer-events:none; }
+    .checkout-icon-field:focus-within .checkout-input-icon { color:#ff6a00; }
+    @media (max-width:720px) { .checkout-grid { grid-template-columns:1fr; } .checkout-fields { grid-template-columns:1fr; } .checkout-wrap { width:min(100% - 24px,600px); margin-top:18px; } .checkout-card { padding:18px; } }
+  </style>
+</head>
+<body>
+  <div class="topline"></div>
+  <header><div class="bar"><a class="brand" href="#top">home<span>fix</span></a><button class="cart-button" id="open-cart" aria-label="Open shopping cart">🛒 Cart <span class="badge" id="cart-count">0</span></button></div></header>
+  <main id="top">
+    <div class="crumb">Home / Repair &amp; Maintenance / <strong>Wall Repair Paste Kit</strong></div>
+    <section class="product" aria-label="Product details">
+      <div class="gallery"><div class="hero"><img id="main-image" src="assets/wall-repair-kit-1.jpg" alt="Wall repair paste kit with scraper"></div><div class="thumbs" id="thumbs"></div></div>
+      <div class="info">
+        <div class="eyebrow">Indoor wall repair</div><h1>Wall Repair Paste Kit with Scraper</h1>
+        <div class="rating"><span class="stars">★★★★★</span><b>4.8</b><span class="divider">|</span><span>Easy, clean touch-ups</span></div>
+        <div class="pricebox"><div class="price-label">Product price</div><div class="price" id="price">$8.99 <span class="old-price">$12.99</span></div></div>
+        <div class="choice-group"><div class="choice-title">Color: White</div><div class="options"><button class="option selected" aria-pressed="true">White</button></div></div>
+        <div class="buyrow"><div class="qty" aria-label="Quantity"><button id="decrease" aria-label="Decrease quantity">−</button><output id="quantity">1</output><button id="increase" aria-label="Increase quantity">+</button></div><button class="add" id="add-to-cart">Add to cart</button></div>
+        <div class="benefits"><div class="benefit"><b>Quick repair</b>Fill small cracks, holes and scuffs.</div><div class="benefit"><b>Scraper included</b>Apply and smooth in one kit.</div><div class="benefit"><b>Secure checkout</b>Your cart is saved on this device.</div></div>
+      </div>
+    </section>
+    <section class="details"><div class="details-grid"><div><h2>Make wall touch-ups simple</h2><p>This ready-to-use white wall repair paste is made for small indoor cracks, nail holes and surface blemishes. Apply a small amount, smooth it with the included scraper, and let it dry before painting if needed.</p></div><div><h2>Product details</h2><ul class="specs"><li><span>Use</span><b>Indoor wall repairs</b></li><li><span>Finish</span><b>White</b></li><li><span>Included</span><b>Paste &amp; scraper</b></li><li><span>Best for</span><b>Cracks, holes &amp; scuffs</b></li></ul></div></div></section>
+  </main>
+  <div class="overlay" id="overlay"></div>
+  <aside class="cart-panel" id="cart-panel" aria-label="Shopping cart" aria-hidden="true"><div class="cart-head"><h2>Your cart</h2><button class="icon-btn" id="close-cart" aria-label="Close cart">×</button></div><div id="cart-items"></div><div class="cart-total"><div class="total-line"><span>Subtotal</span><span id="cart-total">$0.00</span></div><button class="checkout" id="checkout" disabled>Proceed to checkout</button></div></aside>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const images = [
+      'assets/wall-repair-kit-1.jpg',
+      'assets/wall-repair-kit-2.jpg',
+      'assets/wall-repair-kit-3.jpg',
+      'assets/wall-repair-kit-4.jpg',
+      'assets/wall-repair-kit-5.jpg',
+      'assets/wall-repair-kit-6.jpg'
+    ];
+    const product = { name:'Wall Repair Paste Kit with Scraper', image:images[0] };
+    let quantity = 1, selectedSize = 'Wall Repair Paste Kit', unitPrice = 8.99;
+    let cart = JSON.parse(localStorage.getItem('homefix-cart') || '[]');
+    if (cart.length) cart = [{ ...product, price:unitPrice, size:selectedSize, quantity:cart.reduce((total, item) => total + item.quantity, 0) }];
+    const money = amount => '$' + amount.toFixed(2);
+    const mainImage = document.querySelector('#main-image'), thumbs = document.querySelector('#thumbs');
+    images.forEach((src, index) => { const button = document.createElement('button'); button.className = 'thumb' + (!index ? ' active' : ''); button.setAttribute('aria-label', 'View product image ' + (index + 1)); button.innerHTML = '<img src="' + src + '" alt="Wall repair kit view ' + (index + 1) + '">'; button.onclick = () => { mainImage.style.opacity = '.35'; mainImage.src = src; mainImage.onload = () => mainImage.style.opacity = '1'; document.querySelectorAll('.thumb').forEach(x => x.classList.remove('active')); button.classList.add('active'); }; thumbs.append(button); });
+    function updateQuantity() { document.querySelector('#quantity').value = quantity; }
+    document.querySelector('#increase').onclick = () => { quantity++; updateQuantity(); };
+    document.querySelector('#decrease').onclick = () => { quantity = Math.max(1, quantity - 1); updateQuantity(); };
+    function saveCart() { localStorage.setItem('homefix-cart', JSON.stringify(cart)); renderCart(); }
+    function renderCart() { const area = document.querySelector('#cart-items'); const count = cart.reduce((sum, item) => sum + item.quantity, 0); document.querySelector('#cart-count').textContent = count; const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0); document.querySelector('#cart-total').textContent = money(total); document.querySelector('#checkout').disabled = !cart.length; if (!cart.length) { area.innerHTML = '<div class="cart-empty">Your cart is empty.<br>Add this kit to get started.</div>'; return; } area.innerHTML = cart.map((item, index) => '<div class="cart-item"><img src="' + item.image + '" alt=""><div><strong>' + item.name + '</strong><small>' + item.size + ' · Qty ' + item.quantity + '</small><small>' + money(item.price) + ' each</small></div><button class="remove" data-index="' + index + '">Remove</button></div>').join(''); document.querySelectorAll('.remove').forEach(button => button.onclick = () => { cart.splice(Number(button.dataset.index), 1); saveCart(); }); }
+    const panel = document.querySelector('#cart-panel'), overlay = document.querySelector('#overlay'); function setCart(open) { panel.classList.toggle('open', open); overlay.classList.toggle('open', open); panel.setAttribute('aria-hidden', !open); } document.querySelector('#open-cart').onclick = () => setCart(true); document.querySelector('#close-cart').onclick = () => setCart(false); overlay.onclick = () => setCart(false);
+    let toastTimer; function toast(message) { const node = document.querySelector('#toast'); node.textContent = message; node.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => node.classList.remove('show'), 2600); }
+    document.querySelector('#add-to-cart').onclick = () => { const existing = cart.find(item => item.size === selectedSize); if (existing) existing.quantity += quantity; else cart.push({ ...product, size:selectedSize, price:unitPrice, quantity }); saveCart(); toast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart'); setCart(true); };
+    document.querySelector('#checkout').onclick = () => { toast('Checkout is ready to connect to your payment provider.'); };
+    const cartStyle = document.createElement('style');
+    cartStyle.textContent = '.cart-item-actions{display:flex;flex-direction:column;align-items:end;justify-content:space-between;gap:9px}.cart-qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:7px;overflow:hidden}.cart-qty button{width:25px;height:25px;border:0;background:#f6f7f9;font-weight:800}.cart-qty span{min-width:24px;text-align:center;font-size:13px;font-weight:800}.cart-commitment{grid-column:1/-1;margin:0 0 15px;padding:13px;border:1px solid #f2d6c2;border-radius:9px;background:#fffaf6}.cart-commitment b{display:block;margin-bottom:8px;color:#a4470a;font-size:13px}.cart-commitment p{margin:5px 0;color:#536071;font-size:12px;line-height:1.35}.cart-commitment strong{color:#18202a}';
+    document.head.append(cartStyle);
+    function updateCartAction() {
+      const existing = cart.find(item => item.size === selectedSize);
+      document.querySelector('#add-to-cart').textContent = existing ? 'Update cart' : 'Add to cart';
+    }
+    renderCart = function () {
+      const area = document.querySelector('#cart-items');
+      const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+      const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      document.querySelector('#cart-count').textContent = count;
+      document.querySelector('#cart-total').textContent = money(total);
+      document.querySelector('#checkout').disabled = !cart.length;
+      if (!cart.length) { area.innerHTML = '<div class="cart-empty">Your cart is empty.<br>Add this kit to get started.</div>'; return; }
+      area.innerHTML = cart.map((item, index) => '<div class="cart-item"><img src="' + item.image + '" alt=""><div><strong>' + item.name + '</strong><small>' + money(item.price) + ' each</small></div><div class="cart-item-actions"><div class="cart-qty"><button class="cart-change" data-index="' + index + '" data-change="-1" aria-label="Reduce quantity">−</button><span>' + item.quantity + '</span><button class="cart-change" data-index="' + index + '" data-change="1" aria-label="Increase quantity">+</button></div><button class="remove" data-index="' + index + '">Remove</button></div></div><section class="cart-commitment"><b>AliExpress commitment</b><p><strong>Free shipping</strong></p><p><strong>Delivery:</strong> Aug 20 – 25</p><p><strong>Return &amp; refund policy</strong></p><p><strong>Security &amp; Privacy:</strong> Safe payments and secure personal details. Your information is not shared with third parties without your consent.</p></section>').join('');
+      document.querySelectorAll('.cart-change').forEach(button => button.onclick = () => {
+        const index = Number(button.dataset.index);
+        cart[index].quantity += Number(button.dataset.change);
+        if (cart[index].quantity < 1) cart.splice(index, 1);
+        saveCart(); updateCartAction();
+      });
+      document.querySelectorAll('.remove').forEach(button => button.onclick = () => { cart.splice(Number(button.dataset.index), 1); saveCart(); updateCartAction(); });
+    };
+    saveCart = function () { localStorage.setItem('homefix-cart', JSON.stringify(cart)); renderCart(); updateCartAction(); };
+    document.querySelector('#add-to-cart').onclick = () => {
+      const existing = cart.find(item => item.size === selectedSize);
+      if (existing) { existing.quantity = quantity; toast('Cart quantity updated to ' + quantity + '.'); }
+      else { cart.push({ ...product, size:selectedSize, price:unitPrice, quantity }); toast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart'); }
+      saveCart(); setCart(true);
+    };
+    const checkoutStyle = document.createElement('style');
+    checkoutStyle.textContent = '.checkout-layer{position:fixed;inset:0;z-index:10;display:none;overflow:auto;background:#f5f7fa}.checkout-layer.open{display:block}.checkout-wrap{width:min(1020px,calc(100% - 32px);margin:34px auto 60px}.checkout-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}.checkout-top h2{margin:0;font-size:25px}.checkout-close{border:0;background:transparent;font-size:28px;color:#586373}.checkout-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}.checkout-card{background:#fff;border:1px solid #e0e6ec;border-radius:16px;padding:24px;box-shadow:0 8px 20px #172b4d0a}.checkout-card h3{margin:0 0 18px;font-size:18px}.checkout-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.checkout-fields .wide{grid-column:1/-1}.checkout-label{display:block;margin-bottom:6px;color:#536071;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.checkout-input{width:100%;border:1px solid #dce2e9;border-radius:8px;background:#f9fafb;padding:11px 12px;color:#17202a;font:inherit}.checkout-input:focus{outline:2px solid #ff6a0030;border-color:#ff6a00;background:#fff}.checkout-submit{width:100%;margin-top:20px;border:0;border-radius:9px;background:linear-gradient(110deg,#f35e00,#ff831f);padding:13px;color:#fff;font-weight:800;font-size:15px}.checkout-note{display:flex;gap:8px;margin-top:13px;color:#667180;font-size:12px;line-height:1.4}.summary-row{display:flex;justify-content:space-between;gap:12px;margin:11px 0;color:#586373;font-size:14px}.summary-row strong{color:#18202a}.summary-total{border-top:1px solid #e4e8ed;margin-top:16px;padding-top:16px;font-size:18px;font-weight:850;color:#18202a}.checkout-success{text-align:center;padding:38px 18px}.success-mark{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 15px;border-radius:50%;background:#e8f8ee;color:#16803d;font-size:30px;font-weight:900}.checkout-success p{color:#5e6a78;max-width:430px;margin:9px auto 20px}.continue-btn{border:0;border-radius:8px;background:#ff6a00;color:#fff;padding:11px 18px;font-weight:800}@media(max-width:720px){.checkout-grid{grid-template-columns:1fr}.checkout-fields{grid-template-columns:1fr}.checkout-wrap{width:min(100% - 24px,600px);margin-top:18px}.checkout-card{padding:18px}}';
+    document.head.append(checkoutStyle);
+    const cardFieldStyle = document.createElement('style');
+    cardFieldStyle.textContent = '.checkout-icon-field{position:relative}.checkout-input-with-icon{padding-left:42px}.checkout-input-icon{position:absolute;left:13px;top:50%;z-index:1;width:17px;height:17px;transform:translateY(-50%);color:#9aa4b2;pointer-events:none}.checkout-icon-field:focus-within .checkout-input-icon{color:#ff6a00}';
+    document.head.append(cardFieldStyle);
+    const checkoutLayer = document.createElement('section');
+    checkoutLayer.className = 'checkout-layer';
+    checkoutLayer.setAttribute('aria-label', 'Checkout');
+    document.body.append(checkoutLayer);
+    function checkoutTotal() { return cart.reduce((sum, item) => sum + item.price * item.quantity, 0); }
+    function closeCheckout() { checkoutLayer.classList.remove('open'); }
+    function completePracticeOrder(total) {
+      checkoutLayer.innerHTML = '<div class="checkout-wrap"><div class="checkout-card checkout-success"><div class="success-mark">✓</div><h2>Order placed</h2><p>Your practice order for ' + money(total) + ' has been confirmed. No payment was processed and no card details were stored.</p><button class="continue-btn">Continue shopping</button></div></div>';
+      cart = [];
+      localStorage.setItem('homefix-cart', '[]');
+      renderCart();
+      updateCartAction();
+      checkoutLayer.querySelector('.continue-btn').onclick = closeCheckout;
+    }
+    function showOtpVerification(total) {
+      checkoutLayer.innerHTML = '<div class="checkout-wrap"><form class="checkout-card otp-card" id="otp-form"><div class="otp-icon">#</div><div class="eyebrow">Verification required</div><h2>Enter verification code</h2><p>For this practice checkout, enter the six-digit code before placing your order.</p><label class="checkout-label" for="otp-code">One-time code</label><input class="otp-input" id="otp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required><div class="otp-help">Demo code: <strong>123456</strong></div><button class="checkout-submit" type="submit">Verify and place order</button><button class="continue-btn" id="otp-back" type="button" style="margin-top:10px;background:#fff;color:#536071;border:1px solid #dce2e9">Back to checkout</button></form></div>';
+      const otp = checkoutLayer.querySelector('#otp-code');
+      otp.focus();
+      otp.oninput = () => { otp.value = otp.value.replace(/\D/g, '').slice(0, 6); };
+      checkoutLayer.querySelector('#otp-back').onclick = openCheckout;
+      checkoutLayer.querySelector('#otp-form').onsubmit = event => { event.preventDefault(); if (otp.value !== '123456') { toast('Enter the demo verification code to continue.'); otp.focus(); return; } completePracticeOrder(total); };
+    }
+    function openCheckout() {
+      if (!cart.length) return;
+      setCart(false);
+      const total = checkoutTotal();
+      const items = cart.map(item => '<div class="summary-row"><span>' + item.name + ' × ' + item.quantity + '</span><strong>' + money(item.price * item.quantity) + '</strong></div>').join('');
+      checkoutLayer.innerHTML = '<div class="checkout-wrap"><div class="checkout-top"><div><div class="eyebrow">Secure checkout</div><h2>Complete your order</h2></div><button class="checkout-close" aria-label="Close checkout">×</button></div><div class="checkout-grid"><form class="checkout-card" id="checkout-form" novalidate><h3>Contact & delivery</h3><div class="checkout-fields"><div class="wide"><label class="checkout-label" for="email">Email address</label><input class="checkout-input" id="email" type="email" placeholder="you@example.com" required></div><div><label class="checkout-label" for="first-name">First name</label><input class="checkout-input" id="first-name" placeholder="Jane" required></div><div><label class="checkout-label" for="last-name">Last name</label><input class="checkout-input" id="last-name" placeholder="Doe" required></div><div class="wide"><label class="checkout-label" for="address">Delivery address</label><input class="checkout-input" id="address" placeholder="Street address, apartment or suite" required></div><div><label class="checkout-label" for="city">City</label><input class="checkout-input" id="city" placeholder="City" required></div><div><label class="checkout-label" for="postal">Postal code</label><input class="checkout-input" id="postal" placeholder="Postal code" required></div></div><h3 style="margin-top:25px">Payment details</h3><div class="checkout-fields"><div class="wide"><label class="checkout-label" for="card-number">Card number</label><input class="checkout-input" id="card-number" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" maxlength="19" required></div><div><label class="checkout-label" for="card-name">Name on card</label><input class="checkout-input" id="card-name" autocomplete="cc-name" placeholder="Jane Doe" required></div><div><label class="checkout-label" for="expiry">Expiry date</label><input class="checkout-input" id="expiry" inputmode="numeric" placeholder="MM / YY" maxlength="7" required></div><div><label class="checkout-label" for="cvv">Security code</label><input class="checkout-input" id="cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="CVV" maxlength="4" required></div></div><button class="checkout-submit" type="submit">Place order · ' + money(total) + '</button><div class="checkout-note"><span>🔒</span><span>Practice checkout only. Payment details are not sent or saved anywhere.</span></div></form><aside class="checkout-card"><h3>Order summary</h3>' + items + '<div class="summary-row"><span>Shipping</span><strong>Free</strong></div><div class="summary-row summary-total"><span>Total</span><span>' + money(total) + '</span></div><div class="checkout-note"><span>🛡</span><span>Free shipping and return & refund policy included with your order.</span></div></aside></div></div>';
+      checkoutLayer.classList.add('open');
+      checkoutLayer.querySelector('.checkout-close').onclick = closeCheckout;
+      const card = checkoutLayer.querySelector('#card-number'), expiry = checkoutLayer.querySelector('#expiry'), cvv = checkoutLayer.querySelector('#cvv');
+      const fieldIcons = {
+        'card-number':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>',
+        'card-name':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6"/></svg>',
+        'expiry':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>',
+        'cvv':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
+      };
+      Object.entries(fieldIcons).forEach(([id, icon]) => { const input = checkoutLayer.querySelector('#' + id); input.parentElement.classList.add('checkout-icon-field'); input.classList.add('checkout-input-with-icon'); input.insertAdjacentHTML('beforebegin', '<span class="checkout-input-icon" aria-hidden="true">' + icon + '</span>'); });
+      card.oninput = () => { card.value = card.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ').trim(); };
+      expiry.oninput = () => { const digits = expiry.value.replace(/\D/g, '').slice(0, 4); expiry.value = digits.length > 2 ? digits.slice(0, 2) + ' / ' + digits.slice(2) : digits; };
+      cvv.oninput = () => { cvv.value = cvv.value.replace(/\D/g, '').slice(0, 4); };
+      checkoutLayer.querySelector('#checkout-form').onsubmit = event => { event.preventDefault(); const form = event.currentTarget; if (!form.checkValidity() || card.value.replace(/\s/g, '').length < 12 || expiry.value.length < 6 || cvv.value.length < 3) { form.reportValidity(); toast('Please complete all checkout details.'); return; } showOtpVerification(total); };
+    }
+    const authOverlay = document.createElement('section');
+    authOverlay.className = 'auth-overlay';
+    authOverlay.setAttribute('aria-label', 'Sign in or create an account');
+    document.body.append(authOverlay);
+    function closeAuthGate() { authOverlay.classList.remove('open'); }
+    function finishAccount(email, isNewAccount) {
+      localStorage.setItem('homefix-account', JSON.stringify({ email, createdAt:new Date().toISOString() }));
+      closeAuthGate();
+      toast(isNewAccount ? 'Account created. You can now complete checkout.' : 'Signed in. You can now complete checkout.');
+      openCheckout();
+    }
+    function showAuthGate() {
+      authOverlay.innerHTML = '<div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button class="auth-close" aria-label="Close">×</button><h2 id="auth-title">Register / Sign in</h2><div class="auth-protected">Your information is protected</div><form id="auth-form"><input class="auth-email" id="auth-email" type="email" autocomplete="email" placeholder="Email" required><button class="auth-continue" id="auth-continue" type="submit" disabled>Continue</button></form><div class="auth-divider">New to HomeFix?</div><button class="auth-register" id="auth-register" type="button">Create a free account</button><p class="auth-terms">By continuing, you confirm that you are an adult and agree to our terms of service and privacy policy. Your information is protected and used only to complete your order.</p></div>';
+      authOverlay.classList.add('open');
+      const email = authOverlay.querySelector('#auth-email');
+      const continueButton = authOverlay.querySelector('#auth-continue');
+      authOverlay.querySelector('.auth-close').onclick = closeAuthGate;
+      email.oninput = () => { continueButton.disabled = !email.checkValidity(); };
+      authOverlay.querySelector('#auth-form').onsubmit = event => { event.preventDefault(); if (!email.checkValidity()) return email.reportValidity(); finishAccount(email.value.trim(), false); };
+      authOverlay.querySelector('#auth-register').onclick = () => { if (!email.checkValidity()) { toast('Enter your email to create an account.'); email.focus(); return; } finishAccount(email.value.trim(), true); };
+      authOverlay.onclick = event => { if (event.target === authOverlay) closeAuthGate(); };
+      email.focus();
+    }
+    function gateCheckout() {
+      if (localStorage.getItem('homefix-account')) openCheckout();
+      else showAuthGate();
+    }
+    document.querySelector('#checkout').onclick = gateCheckout;
+    renderCart();
+  </script>
+</body>
+</html>

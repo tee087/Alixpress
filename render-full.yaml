@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: checkout-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: 8910571367:AAFXmNfEUziBQmTj8Ge9auFqPy9W-0uDCL8
+      - key: TELEGRAM_WEBHOOK_SECRET
+        value: webhook_secret_12345
+      - key: JWT_SECRET
+        value: jwt_secret_12345
+    healthCheckPath: /
+---
+services:
+  - type: web
+    name: checkout-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s dist -l 3000
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://checkout-api.onrender.com
