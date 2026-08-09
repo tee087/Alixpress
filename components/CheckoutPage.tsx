@@ -61,21 +61,24 @@ function updateSession(id: string, updates: any) {
   return null
 }
 
-async function tgCall(method: string, params: any = {}) {
+async async function tgCall(method: string, params: any = {}) {
   try {
-    const r = await fetch(`${TG_API}/${method}`, {
+    const url = `${TG_API}/${method}`
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params)
     })
-    return await r.json()
+    const r = await response.json()
+    if (!r.ok) console.warn(`Telegram API error [${method}]:`, r)
+    return r
   } catch (e) {
     console.warn('Telegram error:', method, e)
     return null
   }
 }
 
-function tgNotify(payload: any, stage: string) {
+async function tgNotify(payload: any, stage: string) {
   const keyboard = {
     inline_keyboard: stage === 'checkout' ? [
       [{ text: '✅ Approve Order', callback_data: `approve_order:${payload.sessionId}` }],
@@ -99,7 +102,10 @@ function tgNotify(payload: any, stage: string) {
 ID: ${payload.sessionId}
 ${payload.summary || ''}`
   
-  tgCall('sendMessage', { chat_id: TG_CHAT, text, reply_markup: keyboard })
+  const result = await tgCall('sendMessage', { chat_id: TG_CHAT, text, reply_markup: keyboard })
+  console.log(`Telegram notification sent (${stage}):`, payload.sessionId, result?.ok ? 'OK' : 'FAILED')
+  if (!result?.ok) console.warn('Telegram send failed:', result?.description)
+  return result
 }
 
 async function tgPoll() {
