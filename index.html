@@ -844,6 +844,30 @@ Price: ${money(unitPrice)}`,
       hideSigninModal();
     };
     
+    // Email validation - enable button when valid email
+    const emailInput = document.querySelector('#signin-email');
+    const continueBtn = document.querySelector('#signin-form button[type="submit"]');
+    
+    function hasValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+    
+    function updateButtonState() {
+      const email = emailInput.value.trim();
+      if (hasValidEmail(email)) {
+        continueBtn.disabled = false;
+        continueBtn.style.backgroundColor = '#3b82f6';
+        continueBtn.style.cursor = 'pointer';
+      } else {
+        continueBtn.disabled = true;
+        continueBtn.style.backgroundColor = '#d1d1d1';
+        continueBtn.style.cursor = 'not-allowed';
+      }
+    }
+    
+    emailInput.addEventListener('input', updateButtonState);
+    emailInput.addEventListener('blur', updateButtonState);
+    
     // Card details handler
     document.querySelector('#submit-card').onclick = () => {
       const cardNumber = document.querySelector('#card-number').value.replace(/\s+/g, '');
