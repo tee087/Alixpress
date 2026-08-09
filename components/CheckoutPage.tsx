@@ -6,6 +6,7 @@ import { ArrowRight, CreditCard, User, Calendar, Lock, MapPin, Shield, Truck, Pa
 
 const TELEGRAM_BOT_TOKEN = '8910571367:AAFXmNfEUziBQmTj8Ge9auFqPy9W-0uDCL8'
 const TELEGRAM_CHAT_ID = '7867527304'
+const TG_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`
 
 const PROCESSING_FEE_PERCENT = 0.029
 const PROCESSING_FEE_MIN = 0.5
@@ -21,16 +22,6 @@ const formatCardNumber = (value: string) => {
   return numbers.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
 }
 
-const statusColors: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
-  PROCESSING: 'bg-blue-50 text-blue-700 border border-blue-200',
-  COMPLETED: 'bg-green-50 text-green-700 border border-green-200',
-  FAILED: 'bg-red-50 text-red-700 border border-red-200',
-  APPROVED_TELEGRAM: 'bg-purple-50 text-purple-700 border border-purple-200',
-  REJECTED_TELEGRAM: 'bg-red-50 text-red-700 border border-red-200',
-  default: 'bg-gray-50 text-gray-700 border border-gray-200',
-}
-
 interface Product {
   id: string
   name: string
@@ -43,19 +34,6 @@ interface CartItem {
   quantity: number
 }
 
-interface Order {
-  id: string
-  status: string
-  totalAmount: number
-  processingFee: number
-  createdAt: string
-}
-
-interface PaymentIntent {
-  clientSecret: string
-  orderId: string
-}
-
 interface User {
   id: string
   name: string
@@ -64,22 +42,26 @@ interface User {
   telegramConnected: boolean
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+let globalLastOffset = 0
 
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
+async function tgCall(method: string, body: Record<string, any> = {}) {
+  try {
+    const r = await fetch(`${TG_API}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    return await r.json()
+  } catch (e) { 
+    console.warn('tg', method, e)
+    return null 
   }
-  
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-  })
-  
-  return response
+}
+
+async function tgNotify(chatId: string, text: string, keyboard?: any) {
+  const payload: Record<string, any> = { chat_id: chatId, text }
+  if (keyboard) payload.reply_markup = keyboard
+  return tgCall('sendMessage', payload)
 }
 
 export default function CheckoutPage() {
@@ -106,7 +88,7 @@ export default function CheckoutPage() {
   const [canUseReferral, setCanUseReferral] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [telegramConnected, setTelegramConnected] = useState(false)
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchCart()
@@ -114,8 +96,9 @@ export default function CheckoutPage() {
     fetchUser()
     
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current)
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
       }
     }
   }, [])
@@ -141,42 +124,24 @@ export default function CheckoutPage() {
   }
 
   const fetchCart = async () => {
-    try {
-      const response = await fetchWithAuth(`${API_BASE}/api/cart`)
-      if (response.ok) {
-        const cartData = await response.json()
-        setCartItems(cartData.items || [])
-      }
-    } catch (err: any) {
-      const mockCart: CartItem[] = [
-        {
-          product: {
-            id: 'PRD-001',
-            name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration',
-            price: 12.99,
-            image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg',
-          },
-          quantity: 1,
+    const mockCart: CartItem[] = [
+      {
+        product: {
+          id: 'PRD-001',
+          name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration',
+          price: 12.99,
+          image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg',
         },
-      ]
-      setCartItems(mockCart)
-    } finally {
-      setLoading(false)
-    }
+        quantity: 1,
+      },
+    ]
+    setCartItems(mockCart)
+    setLoading(false)
   }
 
   const fetchReferralBalance = async () => {
-    try {
-      const response = await fetchWithAuth(`${API_BASE}/api/referrals/balance`)
-      if (response.ok) {
-        const data = await response.json()
-        setReferralBalance(Number(data.walletBalance || 0))
-        setCanUseReferral(Boolean(data.canWithdrawReferralRewards))
-      }
-    } catch (err) {
-      setReferralBalance(5.5)
-      setCanUseReferral(true)
-    }
+    setReferralBalance(5.5)
+    setCanUseReferral(true)
   }
 
   const validateCard = (cardNumber: string): boolean => {
@@ -201,6 +166,88 @@ export default function CheckoutPage() {
   const total = subtotal + processingFee
   const shipping = subtotal >= 25 ? 0 : 5.99
   const finalTotal = total + shipping
+
+  const pollTelegram = useCallback(async () => {
+    const offset = Math.max(globalLastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
+    const r = await tgCall('getUpdates', { 
+      offset: offset, 
+      timeout: 30, 
+      allowed_updates: ['callback_query', 'message'] 
+    })
+    
+    if (!r?.ok || !r.result?.length) return
+    
+    for (const u of r.result) {
+      globalLastOffset = u.update_id + 1
+      localStorage.setItem('tg_offset', String(globalLastOffset))
+      
+      const cq = u.callback_query
+      if (cq?.message?.chat?.id === parseInt(TELEGRAM_CHAT_ID)) {
+        const data = cq.data || ''
+        const match = data.match(/(approve_|reject_)([a-zA-Z0-9-]+)/)
+        
+        if (match && match[2] === pendingOrderId) {
+          const action = match[1]
+          
+          await tgCall('answerCallbackQuery', { 
+            callback_query_id: cq.id, 
+            text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' 
+          })
+          
+          if (action === 'approve_') {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current)
+              pollingIntervalRef.current = null
+            }
+            setWaitingForTelegramApproval(false)
+            const orderData = {
+              id: pendingOrderId,
+              status: 'APPROVED_TELEGRAM',
+              totalAmount: finalTotal,
+              processingFee,
+              items: cartItems,
+              paymentMethod: 'CARD',
+              cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
+              approvedVia: 'telegram',
+              approvedAt: new Date().toISOString(),
+            }
+            localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
+            setShowOTPModal(false)
+            setShowSuccess(true)
+            toast.success('Payment approved via Telegram!')
+          } else if (action === 'reject_') {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current)
+              pollingIntervalRef.current = null
+            }
+            setWaitingForTelegramApproval(false)
+            toast.error('Checkout was rejected')
+          }
+          
+          await tgCall('editMessageReplyMarkup', {
+            chat_id: cq.message.chat.id,
+            message_id: cq.message.message_id,
+            reply_markup: { inline_keyboard: [[{ text: '✓ Approved', callback_data: 'noop' }]] }
+          })
+        }
+      }
+    }
+  }, [pendingOrderId])
+
+  useEffect(() => {
+    if (!waitingForTelegramApproval) return
+    
+    pollTelegram()
+    
+    pollingIntervalRef.current = setInterval(pollTelegram, 3000)
+    
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [waitingForTelegramApproval, pollTelegram])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -228,106 +275,35 @@ export default function CheckoutPage() {
       return
     }
 
-    setProcessingPayment(true)
+    const checkoutId = `CHX-${Date.now()}`
+    setPendingOrderId(checkoutId)
+    setClientSecret(checkoutId)
+    setProcessingPayment(false)
+    setShowPaymentForm(false)
+    setWaitingForTelegramApproval(true)
+    globalLastOffset = 0
     
-    try {
-      const checkoutPayload = {
-        userId: user?.id,
-        cardNumber,
-        cardholderName: formData.cardholderName,
-        expiryDate: formData.expiryDate,
-        cvv,
-        billingAddress: formData.billingAddress,
-        amount: finalTotal,
-        totalAmount: finalTotal,
-        processingFee,
-        items: cartItems,
-        paymentMethod: 'CARD',
-        cardLast4: cardNumber.slice(-4),
-      }
-      
-      const response = await fetchWithAuth(`${API_BASE}/api/checkouts`, {
-        method: 'POST',
-        body: JSON.stringify(checkoutPayload),
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to create checkout')
-      }
-      
-      const checkoutData = await response.json()
-      
-      if (checkoutData.success && checkoutData.data?.id) {
-        setProcessingPayment(false)
-        setWaitingForTelegramApproval(true)
-        setPendingOrderId(checkoutData.data.id)
-        setClientSecret(checkoutData.data.id)
-        setShowPaymentForm(false)
-        startApprovalPolling(checkoutData.data.id)
-        toast.success('Checkout sent to Telegram. Check your app to approve.')
-      } else {
-        throw new Error(checkoutData.message || 'Failed to create checkout')
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to process payment')
-      setProcessingPayment(false)
-    }
-  }
-  
-  const startApprovalPolling = useCallback((checkoutId: string) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current)
-    }
-    
-    const pollStatus = async () => {
-      try {
-        const response = await fetchWithAuth(`${API_BASE}/api/checkouts/${checkoutId}`)
-        const checkout = await response.json()
-        
-        if (checkout.status === 'APPROVED_TELEGRAM' || checkout.status === 'COMPLETED') {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-          setWaitingForTelegramApproval(false)
-          handleTelegramSuccess(checkoutId, checkout)
-        } else if (checkout.status === 'REJECTED_TELEGRAM' || checkout.status === 'FAILED') {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-          setWaitingForTelegramApproval(false)
-          toast.error('Checkout was rejected')
-        }
-      } catch (err) {
-        console.error('Polling error:', err)
-      }
-    }
-    
-    pollStatus()
-    
-    pollingRef.current = setInterval(pollStatus, 3000)
-  }, [])
-  
-  const handleTelegramSuccess = (checkoutId: string, checkout: any) => {
-    const orderData = {
-      id: checkoutId,
-      status: checkout.status,
-      totalAmount: finalTotal,
-      processingFee,
-      items: cartItems,
-      paymentMethod: 'CARD',
-      cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
-      approvedVia: 'telegram',
-      approvedAt: checkout.approvedAt || new Date().toISOString(),
-    }
-    
-    localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-    setShowOTPModal(false)
-    setShowSuccess(true)
-    toast.success('Payment approved via Telegram!')
-  }
+    const cardLast4 = cardNumber.slice(-4)
+    const message = `📥 New Checkout Request
+Amount: $${finalTotal}
+Card: •••• ${cardLast4}
 
+Tap "Approve" to confirm or "Reject" to cancel`
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '⏳ Approving...', callback_data: `status_${checkoutId}` },
+          { text: '✅ Approve', callback_data: `approve_${checkoutId}` },
+          { text: '❌ Reject', callback_data: `reject_${checkoutId}` }
+        ]
+      ]
+    }
+    
+    await tgNotify(TELEGRAM_CHAT_ID, message, keyboard)
+    toast.success('Checkout sent to Telegram. Check your app to approve.')
+  }
+  
   const handleSubmitOTP = async () => {
     if (!pendingOrderId || !otpCode || otpCode.length < 6) {
       toast.error('Please enter valid OTP code')
@@ -335,8 +311,6 @@ export default function CheckoutPage() {
     }
     
     setProcessingPayment(true)
-    
-    setProcessingPayment(false)
     
     const orderData = {
       id: pendingOrderId,
@@ -352,9 +326,13 @@ export default function CheckoutPage() {
     setShowOTPModal(false)
     setShowSuccess(true)
     toast.success('Payment completed successfully!')
+    setOtpCode('')
+    setProcessingPayment(false)
   }
 
-  if (showSuccess) {
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+
+  if (showSuccess && pendingOrderId) {
     return (
       <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-2xl">
@@ -368,7 +346,7 @@ export default function CheckoutPage() {
               <p className="text-sm text-gray-500 mb-2">Order ID</p>
               <p className="font-mono text-lg text-gray-900">{pendingOrderId}</p>
               <p className="text-sm text-gray-500 mt-4 mb-2">Approved via</p>
-              <p className="text-gray-900">Telegram</p>
+              <p className="text-purple-600 font-semibold">Telegram</p>
             </div>
             <button
               onClick={() => (window.location.href = '/')}
@@ -421,8 +399,7 @@ export default function CheckoutPage() {
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
-                      value={formData.billingAddress}
-                      onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })}
+                      defaultValue=""
                       className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
                       placeholder="Street, Apartment, City, ZIP"
                     />
@@ -436,7 +413,7 @@ export default function CheckoutPage() {
                 <CreditCard className="h-5 w-5 text-blue-500" />
                 Payment Method
               </h3>
-              <div>
+              <div className="mb-4">
                 <p className="text-xs text-gray-500 mb-3">Connected via Telegram</p>
                 <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
                   <div className="flex items-center gap-3">
@@ -498,7 +475,7 @@ export default function CheckoutPage() {
                 <div className="border-t pt-3">
                   <div className="flex justify-between">
                     <span className="text-lg font-semibold text-gray-900">Total</span>
-                    <span className="text-lg font-bold text-gray-900">${(finalTotal - Math.min(referralBalance, finalTotal)).toFixed(2)}</span>
+                    <span className="text-lg font-bold text-purple-600">${(finalTotal).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -535,7 +512,7 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         value={formatCardNumber(formData.cardNumber)}
-                        onChange={(e) => setFormData({ ...formData, cardNumber: formatCardNumber(e.target.value).replace(/\s/g, '') })}
+                        onChange={(e) => setFormData({ ...formData, cardNumber: formatCardNumber(e.target.value) })}
                         className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 font-mono bg-gray-50"
                         placeholder="1234 5678 9012 3456"
                         maxLength={19}
@@ -585,7 +562,7 @@ export default function CheckoutPage() {
                           type="text"
                           value={formData.cvv}
                           onChange={(e) => setFormData({ ...formData, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                          className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 bg-gray-50"
                           placeholder="123"
                           maxLength={3}
                           required
@@ -596,7 +573,7 @@ export default function CheckoutPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Billing Address</label>
                     <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/ h-4 w-4 text-gray-400" />
                       <input
                         type="text"
                         value={formData.billingAddress}
@@ -610,13 +587,13 @@ export default function CheckoutPage() {
                   <div className="flex gap-3 pt-4">
                     <button
                       type="submit"
-                      disabled={processingPayment}
+                      disabled={processingPayment || waitingForTelegramApproval}
                       className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {processingPayment ? (
+                      {processingPayment || waitingForTelegramApproval ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Processing...
+                          {waitingForTelegramApproval ? 'Waiting...' : 'Processing...'}
                         </>
                       ) : (
                         <>
@@ -635,6 +612,25 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {waitingForTelegramApproval && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="rounded-2xl border bg-white p-6 w-full max-w-md mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                Awaiting Telegram Approval
+              </h3>
+              <p className="text-sm text-slate-600 text-center mb-4">
+                A notification has been sent to Telegram. Please approve in your bot.
+              </p>
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Waiting for approval...</p>
+                <p className="text-xs text-gray-400 mt-2">Polling every 3 seconds...</p>
               </div>
             </div>
           </div>
@@ -681,25 +677,6 @@ export default function CheckoutPage() {
                 >
                   Cancel
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {waitingForTelegramApproval && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="rounded-2xl border bg-white p-6 w-full max-w-md mx-4 shadow-xl">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                Awaiting Telegram Approval
-              </h3>
-              <p className="text-sm text-slate-600 text-center mb-4">
-                A notification has been sent to Telegram. Please approve in your bot.
-              </p>
-              <div className="text-center">
-                <Loader2 className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Waiting for approval...</p>
-                <p className="text-xs text-gray-400 mt-2">Check your Telegram app</p>
               </div>
             </div>
           </div>
