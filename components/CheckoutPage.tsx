@@ -186,7 +186,7 @@ export default function CheckoutPage() {
 
   const fetchCart = async () => {
     const mockCart: CartItem[] = [{
-      product: { id: 'PRD-001', name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration', price: 12.99, image: 'https://ae-pic-a1.aliexpress-media.com/kf/S0b0721e749814123ae9203b340dee9073.jpg' },
+      product: { id: 'PRD-001', name: 'Wall Paste Repair kit Coating Sealant Agent With Scraper Crack Hole Mending Paste Mildewproof Patch White Wall Restoration', price: 12.99, image: '/assets/wall-repair-kit-1.jpg' },
       quantity: 1,
     }]
     setCartItems(mockCart)
