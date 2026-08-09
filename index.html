@@ -601,22 +601,19 @@
           continue;
         }
         
-        const [, action, kind, sessionId] = match;
-        console.log('Processing callback:', { action, kind, sessionId });
-        
-        const session = sessions.get(sessionId);
-        if (!session) {
-          await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Session not found' });
-          console.log('Session not found in Map:', sessionId, 'Sessions:', Array.from(sessions.keys()));
-          continue;
-        }
-        
-        const [, action, kind, sessionId] = match;
-        const session = sessions.get(sessionId);
-        
-        if (session) {
-          session.stage = action === 'approve' ? `${kind}_approved` : `${kind}_rejected`;
-          sessions.set(sessionId, session);
+const [, action, kind, sessionId] = match;
+      console.log('Processing callback:', { action, kind, sessionId });
+      
+      const session = sessions.get(sessionId);
+      if (!session) {
+        await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Session not found' });
+        console.log('Session not found in Map:', sessionId, 'Sessions:', Array.from(sessions.keys()));
+        continue;
+      }
+      
+      if (session) {
+        session.stage = action === 'approve' ? `${kind}_approved` : `${kind}_rejected`;
+        sessions.set(sessionId, session);
           
           await tgCall('answerCallbackQuery', {
             callback_query_id: cq.id,
