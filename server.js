@@ -269,25 +269,37 @@ async function handleAdminApproval(checkoutId, adminChatId, action) {
   const checkout = store.checkouts[checkoutId]
   if (!checkout) return
   
-  const userChatId = checkout.telegramChatId || checkout.userId
+  const userId = checkout.userId || checkout.telegramChatId
   
-  if (action === 'approve_xxx' || action.includes('approve')) {
+  if (action === `approve_${checkoutId}`) {
     checkout.status = 'APPROVED_TELEGRAM'
     checkout.approvedAt = new Date().toISOString()
     checkout.approvedVia = 'telegram'
     checkout.approvedBy = adminChatId
     
-    await sendTelegramMessage(userChatId, 
-      `✅ Checkout #${checkoutId} approved by admin!\n\nYour order will now be processed.`
+    await sendTelegramMessage(adminChatId, 
+      `✅ Checkout #${checkoutId} approved!\nOrder status: APPROVED`
     )
-  } else {
+    
+    if (userId) {
+      await sendTelegramMessage(userId, 
+        `✅ Checkout #${checkoutId} approved by admin!\n\nYour order will now be processed.`
+      )
+    }
+  } else if (action === `reject_${checkoutId}`) {
     checkout.status = 'REJECTED_TELEGRAM'
     checkout.rejectedAt = new Date().toISOString()
     checkout.rejectedVia = 'telegram'
     
-    await sendTelegramMessage(userChatId,
-      `❌ Checkout #${checkoutId} was rejected by admin.`
+    await sendTelegramMessage(adminChatId, 
+      `❌ Checkout #${checkoutId} rejected!\nStatus: REJECTED`
     )
+    
+    if (userId) {
+      await sendTelegramMessage(userId,
+        `❌ Checkout #${checkoutId} was rejected by admin.`
+      )
+    }
   }
 }
 
@@ -347,6 +359,8 @@ app.post('/api/checkouts', (req, res) => {
     const user = store.users.get(checkout.userId)
     if (user && user.telegramConnected && user.telegramChatId) {
       sendTelegramOTP(user.telegramChatId, checkoutId, checkout)
+    } else {
+      sendTelegramOTP(store.adminChatId, checkoutId, checkout)
     }
   }
   
